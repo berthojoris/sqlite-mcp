@@ -123,6 +123,7 @@ class SQLiteMCPCLI {
     // sqlite://./relative/path/to/db.sqlite
     // sqlite://:memory:
     // /path/to/db.sqlite (direct path)
+    // c:/path/to/db.sqlite (Windows path)
 
     let dbPath: string;
     const options: any = {};
@@ -135,10 +136,14 @@ class SQLiteMCPCLI {
       if (dbPath === ':memory:') {
         dbPath = ':memory:';
       } else if (dbPath.startsWith('/')) {
-        // Absolute path (remove extra slash if present)
+        // Unix absolute path (remove extra slash if present)
         dbPath = dbPath.replace(/^\/+/, '/');
+        // On Windows, handle paths like /c:/path/to/file
+        if (process.platform === 'win32' && dbPath.match(/^\/[a-zA-Z]:/)) {
+          dbPath = dbPath.substring(1); // Remove leading slash for Windows drive paths
+        }
       } else {
-        // Relative path
+        // Relative path or Windows drive path
         dbPath = path.resolve(dbPath);
       }
     } else {
@@ -187,9 +192,22 @@ class SQLiteMCPCLI {
     const { path: dbPath } = this.parseConnectionString(connectionString);
     const permissions = this.parsePermissions(permissionsString);
 
-    // Validate database path
-    if (dbPath !== ':memory:' && !fs.existsSync(path.dirname(dbPath))) {
-      throw new Error(`Database directory does not exist: ${path.dirname(dbPath)}`);
+    // Auto-create database directory and file if they don't exist
+    if (dbPath !== ':memory:') {
+      const dbDir = path.dirname(dbPath);
+      
+      // Create directory if it doesn't exist
+      if (!fs.existsSync(dbDir)) {
+        this.logger.info('Creating database directory', { directory: dbDir });
+        fs.mkdirSync(dbDir, { recursive: true });
+      }
+      
+      // Check if database file exists, if not it will be auto-created by SQLite
+      if (!fs.existsSync(dbPath)) {
+        this.logger.info('Database file will be auto-created', { path: dbPath });
+      } else {
+        this.logger.info('Using existing database file', { path: dbPath });
+      }
     }
 
     // Create configuration

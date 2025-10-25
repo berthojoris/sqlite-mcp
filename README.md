@@ -34,6 +34,12 @@ The server implements a granular permission system with the following types:
 - **Audit Trail**: Complete operation logging with client tracking
 - **Input Sanitization**: Parameter validation and sanitization
 
+### Auto-Creation Features
+- **Database Auto-Creation**: Automatically creates database files if they don't exist
+- **Directory Auto-Creation**: Creates parent directories recursively as needed
+- **Intelligent Initialization**: Detects new vs existing databases and logs appropriately
+- **Zero-Configuration Setup**: Works out-of-the-box with any valid SQLite path
+
 ## 📦 Installation
 
 ### NPX Usage (Recommended)
@@ -349,6 +355,66 @@ npm run check
 - `LOG_LEVEL`: Default logging level
 - `MCP_SQLITE_CONFIG`: Default configuration file path
 
+## 🗺️ Roadmap
+
+### Version 1.1.0 - Enhanced Query & Performance (Q1 2025)
+- **Advanced Query Builder**: Visual query builder with drag-and-drop interface
+- **Query Optimization**: Automatic query analysis and optimization suggestions
+- **Performance Metrics**: Real-time query performance monitoring and analytics
+- **Connection Health Monitoring**: Advanced connection pool health checks
+- **Memory Usage Optimization**: Improved memory management for large datasets
+
+### Version 1.2.0 - Data Management & Migration (Q2 2025)
+- **Database Migration Tools**: Schema versioning and migration management
+- **Data Import/Export**: Support for CSV, JSON, XML data import/export
+- **Bulk Operations**: Enhanced bulk insert/update/delete with progress tracking
+- **Data Validation**: Custom validation rules and constraints
+- **Backup Scheduling**: Automated backup scheduling with retention policies
+
+### Version 1.3.0 - Advanced Security & Compliance (Q2 2025)
+- **Role-Based Access Control (RBAC)**: Advanced user roles and permissions
+- **Data Encryption**: At-rest and in-transit data encryption
+- **Compliance Reporting**: GDPR, HIPAA, SOX compliance reporting tools
+- **Advanced Audit Logging**: Enhanced audit trails with data lineage tracking
+- **Security Scanning**: Automated security vulnerability scanning
+
+### Version 1.4.0 - Integration & Extensibility (Q3 2025)
+- **Plugin System**: Extensible plugin architecture for custom functionality
+- **REST API Gateway**: RESTful API layer for non-MCP clients
+- **GraphQL Support**: GraphQL query interface for flexible data access
+- **Webhook Integration**: Event-driven webhooks for database changes
+- **Third-party Integrations**: Slack, Discord, Teams notifications
+
+### Version 1.5.0 - AI & Analytics (Q3 2025)
+- **Natural Language Queries**: AI-powered natural language to SQL conversion
+- **Intelligent Schema Suggestions**: AI-driven schema optimization recommendations
+- **Anomaly Detection**: Machine learning-based anomaly detection in data patterns
+- **Predictive Analytics**: Built-in predictive analytics and forecasting
+- **Auto-Indexing**: AI-powered automatic index creation and optimization
+
+### Version 1.6.0 - Scalability & Clustering (Q4 2025)
+- **Read Replicas**: Support for SQLite read replicas and load balancing
+- **Horizontal Scaling**: Multi-database sharding and federation
+- **Distributed Transactions**: Cross-database transaction support
+- **Cache Layer**: Intelligent caching with Redis/Memcached integration
+- **Load Balancing**: Advanced load balancing strategies
+
+### Version 2.0.0 - Enterprise Features (Q1 2026)
+- **Multi-Database Support**: PostgreSQL, MySQL, SQL Server connectors
+- **Enterprise Dashboard**: Comprehensive management dashboard
+- **Advanced Monitoring**: Prometheus/Grafana integration
+- **High Availability**: Failover and disaster recovery features
+- **Enterprise SSO**: SAML, OAuth2, LDAP integration
+- **Container Orchestration**: Kubernetes operator and Helm charts
+
+### Long-term Vision (2026+)
+- **Cloud-Native Architecture**: Serverless deployment options
+- **Real-time Collaboration**: Multi-user real-time database editing
+- **Visual Database Designer**: Drag-and-drop database schema designer
+- **Time-series Data Support**: Specialized time-series data handling
+- **Blockchain Integration**: Immutable audit trails using blockchain
+- **Edge Computing**: Edge deployment for IoT and distributed systems
+
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -369,6 +435,12 @@ For issues, questions, or contributions:
 - Documentation: [Full Documentation](https://github.com/berthojoris/mcp-sqlite-server/wiki)
 
 ## 🔄 Version History
+
+### v1.0.1
+- **Auto-Creation Features**: Database and directory auto-creation functionality
+- **Enhanced Logging**: Improved initialization logging with database status
+- **Roadmap Documentation**: Comprehensive roadmap for future development
+- **Bug Fixes**: Minor improvements and stability enhancements
 
 ### v1.0.0
 - Initial release

@@ -38,8 +38,19 @@ export class DatabaseManager {
     try {
       this.logger.info('Initializing database connection', { path: this.config.path });
 
-      // Create main database connection
+      // Check if database file exists before connection
+      const isNewDatabase = this.config.path !== ':memory:' && !fs.existsSync(this.config.path);
+      
+      if (isNewDatabase) {
+        this.logger.info('Creating new SQLite database file', { path: this.config.path });
+      }
+
+      // Create main database connection (SQLite will auto-create the file)
       this.db = this.createConnection();
+      
+      if (isNewDatabase) {
+        this.logger.info('New SQLite database file created successfully', { path: this.config.path });
+      }
       
       // Initialize connection pool
       await this.initializeConnectionPool();
@@ -50,7 +61,11 @@ export class DatabaseManager {
       // Create audit tables if they don't exist
       this.createAuditTables();
 
-      this.logger.info('Database initialized successfully');
+      this.logger.info('Database initialized successfully', { 
+        path: this.config.path,
+        isNewDatabase,
+        readOnly: this.config.readOnly 
+      });
     } catch (error) {
       this.logger.error('Failed to initialize database', { error });
       throw error;
