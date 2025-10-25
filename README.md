@@ -269,6 +269,106 @@ Create a backup of the database.
 
 **Required Permissions:** `utility`
 
+### `sqlite_bulk_insert`
+Perform bulk insert operations with relational data support and progress tracking.
+
+**Parameters:**
+- `mainTable` (string): Main table name to insert into
+- `records` (array): Array of records to insert
+- `relatedData` (object, optional): Related table data with foreign key mappings
+- `options` (object, optional): Bulk insert options
+  - `batchSize` (number): Batch size for processing (default: 1000)
+  - `continueOnError` (boolean): Continue processing on errors (default: false)
+  - `validateForeignKeys` (boolean): Validate foreign key constraints (default: true)
+  - `insertRelatedData` (boolean): Insert related table data first (default: true)
+
+**Required Permissions:** `create`
+
+**Example:**
+```json
+{
+  "mainTable": "posts",
+  "records": [
+    {"title": "Post 1", "content": "Content 1", "user_id": 1},
+    {"title": "Post 2", "content": "Content 2", "user_id": 2}
+  ],
+  "relatedData": {
+    "users": [
+      {"id": 1, "name": "John", "email": "john@example.com"},
+      {"id": 2, "name": "Jane", "email": "jane@example.com"}
+    ]
+  },
+  "options": {
+    "batchSize": 500,
+    "continueOnError": true,
+    "validateForeignKeys": true
+  }
+}
+```
+
+### `sqlite_bulk_update`
+Perform bulk update operations with progress tracking.
+
+**Parameters:**
+- `table` (string): Table name to update
+- `updates` (array): Array of update operations with `data` and `where` conditions
+- `options` (object, optional): Bulk update options
+  - `batchSize` (number): Batch size for processing (default: 1000)
+  - `continueOnError` (boolean): Continue processing on errors (default: false)
+  - `validateForeignKeys` (boolean): Validate foreign key constraints (default: true)
+
+**Required Permissions:** `update`
+
+**Example:**
+```json
+{
+  "table": "users",
+  "updates": [
+    {
+      "data": {"name": "John Updated", "email": "john.new@example.com"},
+      "where": {"id": 1}
+    },
+    {
+      "data": {"status": "active"},
+      "where": {"last_login": {"$gt": "2024-01-01"}}
+    }
+  ],
+  "options": {
+    "batchSize": 100,
+    "continueOnError": false
+  }
+}
+```
+
+### `sqlite_bulk_delete`
+Perform bulk delete operations with cascading support and progress tracking.
+
+**Parameters:**
+- `table` (string): Table name to delete from
+- `conditions` (array): Array of WHERE conditions for deletion
+- `options` (object, optional): Bulk delete options
+  - `batchSize` (number): Batch size for processing (default: 1000)
+  - `continueOnError` (boolean): Continue processing on errors (default: false)
+  - `cascadeDelete` (boolean): Enable cascade delete for related records (default: true)
+
+**Required Permissions:** `delete`
+
+**Example:**
+```json
+{
+  "table": "posts",
+  "conditions": [
+    {"created_at": {"$lt": "2023-01-01"}},
+    {"status": "deleted"},
+    {"user_id": {"$in": [1, 2, 3]}}
+  ],
+  "options": {
+    "batchSize": 50,
+    "cascadeDelete": true
+  }
+}
+```
+
 ## 🔒 Security Guidelines
 
 ### Best Practices
@@ -383,7 +483,7 @@ npm run check
 ### 📋 Version 1.2.0 - Data Management & Migration (Q2 2025)
 - [ ] **Database Migration Tools**: Schema versioning and migration management
 - [ ] **Data Import/Export**: Support for CSV, JSON, XML data import/export
-- [ ] **Bulk Operations**: Enhanced bulk insert/update/delete with progress tracking
+- [x] **Bulk Operations**: Enhanced bulk insert/update/delete with progress tracking ✅
 - [ ] **Data Validation**: Custom validation rules and constraints
 - [ ] **Backup Scheduling**: Automated backup scheduling with retention policies
 

@@ -137,4 +137,82 @@ export interface QueryValidationResult {
     detectedOperations: string[];
     requiredPermissions: PermissionType[];
 }
+export interface BulkOperationProgress {
+    totalRecords: number;
+    processedRecords: number;
+    successfulRecords: number;
+    failedRecords: number;
+    currentBatch: number;
+    totalBatches: number;
+    startTime: Date;
+    estimatedTimeRemaining?: number;
+    errors: BulkOperationError[];
+}
+export interface BulkOperationError {
+    recordIndex: number;
+    record: any;
+    error: string;
+    timestamp: Date;
+}
+export interface BulkOperationResult {
+    success: boolean;
+    progress: BulkOperationProgress;
+    executionTime: number;
+    summary: {
+        totalRecords: number;
+        successfulRecords: number;
+        failedRecords: number;
+        affectedTables: string[];
+    };
+}
+export interface BulkInsertOptions {
+    batchSize?: number;
+    continueOnError?: boolean;
+    validateForeignKeys?: boolean;
+    insertRelatedData?: boolean;
+    progressCallback?: (progress: BulkOperationProgress) => void;
+}
+export interface BulkUpdateOptions {
+    batchSize?: number;
+    continueOnError?: boolean;
+    validateForeignKeys?: boolean;
+    progressCallback?: (progress: BulkOperationProgress) => void;
+}
+export interface BulkDeleteOptions {
+    batchSize?: number;
+    continueOnError?: boolean;
+    cascadeDelete?: boolean;
+    progressCallback?: (progress: BulkOperationProgress) => void;
+}
+export interface RelationalDataMap {
+    [tableName: string]: {
+        records: any[];
+        foreignKeyMappings: {
+            [localColumn: string]: {
+                referencedTable: string;
+                referencedColumn: string;
+                valueMapping?: Map<any, any>;
+            };
+        };
+    };
+}
+export interface BulkInsertData {
+    mainTable: string;
+    records: any[];
+    relatedData?: RelationalDataMap;
+    options?: BulkInsertOptions;
+}
+export interface BulkUpdateData {
+    table: string;
+    updates: Array<{
+        data: any;
+        where: any;
+    }>;
+    options?: BulkUpdateOptions;
+}
+export interface BulkDeleteData {
+    table: string;
+    conditions: any[];
+    options?: BulkDeleteOptions;
+}
 //# sourceMappingURL=index.d.ts.map

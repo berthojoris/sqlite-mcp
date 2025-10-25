@@ -64,6 +64,18 @@ export declare class MCPSQLiteServer {
      */
     private handleBackup;
     /**
+     * Handle bulk insert operation
+     */
+    private handleBulkInsert;
+    /**
+     * Handle bulk update operation
+     */
+    private handleBulkUpdate;
+    /**
+     * Handle bulk delete operation
+     */
+    private handleBulkDelete;
+    /**
      * Set client permissions
      */
     setClientPermissions(clientId: string, permissions: PermissionType[]): void;

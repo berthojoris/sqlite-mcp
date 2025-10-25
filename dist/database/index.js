@@ -496,6 +496,350 @@ class DatabaseManager {
         }
     }
     /**
+     * Bulk insert operation with relational data support
+     */
+    async bulkInsert(data) {
+        const startTime = new Date();
+        const batchSize = data.options?.batchSize || 1000;
+        const continueOnError = data.options?.continueOnError || false;
+        const insertRelatedData = data.options?.insertRelatedData || false;
+        const progress = {
+            totalRecords: data.records.length,
+            processedRecords: 0,
+            successfulRecords: 0,
+            failedRecords: 0,
+            currentBatch: 0,
+            totalBatches: Math.ceil(data.records.length / batchSize),
+            startTime,
+            errors: []
+        };
+        const affectedTables = new Set([data.mainTable]);
+        const connection = this.getConnection();
+        try {
+            // Begin transaction
+            const transaction = connection.transaction(() => {
+                // First, handle related data if specified
+                const relatedDataMappings = new Map();
+                if (insertRelatedData && data.relatedData) {
+                    for (const [tableName, tableData] of Object.entries(data.relatedData)) {
+                        affectedTables.add(tableName);
+                        const valueMapping = new Map();
+                        relatedDataMappings.set(tableName, valueMapping);
+                        // Insert related records and track ID mappings
+                        for (const relatedRecord of tableData.records) {
+                            try {
+                                const columns = Object.keys(relatedRecord);
+                                const placeholders = columns.map(() => '?').join(', ');
+                                const insertSql = `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
+                                const stmt = connection.prepare(insertSql);
+                                const result = stmt.run(...Object.values(relatedRecord));
+                                // Map original value to new ID for foreign key references
+                                for (const [localColumn, mapping] of Object.entries(tableData.foreignKeyMappings)) {
+                                    if (relatedRecord[mapping.referencedColumn] !== undefined) {
+                                        valueMapping.set(relatedRecord[mapping.referencedColumn], result.lastInsertRowid);
+                                    }
+                                }
+                            }
+                            catch (error) {
+                                if (!continueOnError)
+                                    throw error;
+                                progress.errors.push({
+                                    recordIndex: -1,
+                                    record: relatedRecord,
+                                    error: error.message,
+                                    timestamp: new Date()
+                                });
+                            }
+                        }
+                    }
+                }
+                // Process main table data in batches
+                for (let i = 0; i < data.records.length; i += batchSize) {
+                    const batch = data.records.slice(i, i + batchSize);
+                    progress.currentBatch++;
+                    for (let j = 0; j < batch.length; j++) {
+                        const record = { ...batch[j] };
+                        const recordIndex = i + j;
+                        try {
+                            // Replace foreign key values with mapped IDs if needed
+                            if (insertRelatedData && data.relatedData) {
+                                for (const [tableName, tableData] of Object.entries(data.relatedData)) {
+                                    const mapping = relatedDataMappings.get(tableName);
+                                    if (mapping) {
+                                        for (const [localColumn, fkMapping] of Object.entries(tableData.foreignKeyMappings)) {
+                                            if (record[localColumn] !== undefined && mapping.has(record[localColumn])) {
+                                                record[localColumn] = mapping.get(record[localColumn]);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            const columns = Object.keys(record);
+                            const placeholders = columns.map(() => '?').join(', ');
+                            const insertSql = `INSERT INTO ${data.mainTable} (${columns.join(', ')}) VALUES (${placeholders})`;
+                            const stmt = connection.prepare(insertSql);
+                            stmt.run(...Object.values(record));
+                            progress.successfulRecords++;
+                        }
+                        catch (error) {
+                            progress.failedRecords++;
+                            progress.errors.push({
+                                recordIndex,
+                                record: batch[j],
+                                error: error.message,
+                                timestamp: new Date()
+                            });
+                            if (!continueOnError) {
+                                throw error;
+                            }
+                        }
+                        progress.processedRecords++;
+                        // Call progress callback if provided
+                        if (data.options?.progressCallback) {
+                            const elapsed = Date.now() - startTime.getTime();
+                            const recordsPerMs = progress.processedRecords / elapsed;
+                            const remainingRecords = progress.totalRecords - progress.processedRecords;
+                            progress.estimatedTimeRemaining = remainingRecords / recordsPerMs;
+                            data.options.progressCallback(progress);
+                        }
+                    }
+                }
+            });
+            transaction();
+            const executionTime = Date.now() - startTime.getTime();
+            return {
+                success: progress.failedRecords === 0 || continueOnError,
+                progress,
+                executionTime,
+                summary: {
+                    totalRecords: progress.totalRecords,
+                    successfulRecords: progress.successfulRecords,
+                    failedRecords: progress.failedRecords,
+                    affectedTables: Array.from(affectedTables)
+                }
+            };
+        }
+        catch (error) {
+            this.logger.error('Bulk insert failed', { error: error.message });
+            throw error;
+        }
+        finally {
+            this.returnConnection(connection);
+        }
+    }
+    /**
+     * Bulk update operation with progress tracking
+     */
+    async bulkUpdate(data) {
+        const startTime = new Date();
+        const batchSize = data.options?.batchSize || 1000;
+        const continueOnError = data.options?.continueOnError || false;
+        const progress = {
+            totalRecords: data.updates.length,
+            processedRecords: 0,
+            successfulRecords: 0,
+            failedRecords: 0,
+            currentBatch: 0,
+            totalBatches: Math.ceil(data.updates.length / batchSize),
+            startTime,
+            errors: []
+        };
+        const connection = this.getConnection();
+        try {
+            const transaction = connection.transaction(() => {
+                for (let i = 0; i < data.updates.length; i += batchSize) {
+                    const batch = data.updates.slice(i, i + batchSize);
+                    progress.currentBatch++;
+                    for (let j = 0; j < batch.length; j++) {
+                        const update = batch[j];
+                        const recordIndex = i + j;
+                        try {
+                            const setClause = Object.keys(update.data)
+                                .map(key => `${key} = ?`)
+                                .join(', ');
+                            const whereClause = Object.keys(update.where)
+                                .map(key => `${key} = ?`)
+                                .join(' AND ');
+                            const updateSql = `UPDATE ${data.table} SET ${setClause} WHERE ${whereClause}`;
+                            const stmt = connection.prepare(updateSql);
+                            const result = stmt.run(...Object.values(update.data), ...Object.values(update.where));
+                            if (result.changes > 0) {
+                                progress.successfulRecords++;
+                            }
+                            else {
+                                progress.failedRecords++;
+                                progress.errors.push({
+                                    recordIndex,
+                                    record: update,
+                                    error: 'No rows affected - record may not exist',
+                                    timestamp: new Date()
+                                });
+                            }
+                        }
+                        catch (error) {
+                            progress.failedRecords++;
+                            progress.errors.push({
+                                recordIndex,
+                                record: update,
+                                error: error.message,
+                                timestamp: new Date()
+                            });
+                            if (!continueOnError) {
+                                throw error;
+                            }
+                        }
+                        progress.processedRecords++;
+                        if (data.options?.progressCallback) {
+                            const elapsed = Date.now() - startTime.getTime();
+                            const recordsPerMs = progress.processedRecords / elapsed;
+                            const remainingRecords = progress.totalRecords - progress.processedRecords;
+                            progress.estimatedTimeRemaining = remainingRecords / recordsPerMs;
+                            data.options.progressCallback(progress);
+                        }
+                    }
+                }
+            });
+            transaction();
+            const executionTime = Date.now() - startTime.getTime();
+            return {
+                success: progress.failedRecords === 0 || continueOnError,
+                progress,
+                executionTime,
+                summary: {
+                    totalRecords: progress.totalRecords,
+                    successfulRecords: progress.successfulRecords,
+                    failedRecords: progress.failedRecords,
+                    affectedTables: [data.table]
+                }
+            };
+        }
+        catch (error) {
+            this.logger.error('Bulk update failed', { error: error.message });
+            throw error;
+        }
+        finally {
+            this.returnConnection(connection);
+        }
+    }
+    /**
+     * Bulk delete operation with cascading support
+     */
+    async bulkDelete(data) {
+        const startTime = new Date();
+        const batchSize = data.options?.batchSize || 1000;
+        const continueOnError = data.options?.continueOnError || false;
+        const cascadeDelete = data.options?.cascadeDelete || false;
+        const progress = {
+            totalRecords: data.conditions.length,
+            processedRecords: 0,
+            successfulRecords: 0,
+            failedRecords: 0,
+            currentBatch: 0,
+            totalBatches: Math.ceil(data.conditions.length / batchSize),
+            startTime,
+            errors: []
+        };
+        const affectedTables = new Set([data.table]);
+        const connection = this.getConnection();
+        try {
+            // Get foreign key relationships if cascade delete is enabled
+            let foreignKeyTables = [];
+            if (cascadeDelete) {
+                const fkQuery = `
+          SELECT DISTINCT m.name as table_name
+          FROM sqlite_master m
+          JOIN pragma_foreign_key_list(m.name) fk ON fk.table = ?
+          WHERE m.type = 'table'
+        `;
+                const fkResult = connection.prepare(fkQuery).all(data.table);
+                foreignKeyTables = fkResult.map((row) => row.table_name);
+                foreignKeyTables.forEach(table => affectedTables.add(table));
+            }
+            const transaction = connection.transaction(() => {
+                for (let i = 0; i < data.conditions.length; i += batchSize) {
+                    const batch = data.conditions.slice(i, i + batchSize);
+                    progress.currentBatch++;
+                    for (let j = 0; j < batch.length; j++) {
+                        const condition = batch[j];
+                        const recordIndex = i + j;
+                        try {
+                            // Handle cascade delete first
+                            if (cascadeDelete && foreignKeyTables.length > 0) {
+                                for (const fkTable of foreignKeyTables) {
+                                    const whereClause = Object.keys(condition)
+                                        .map(key => `${key} = ?`)
+                                        .join(' AND ');
+                                    const cascadeDeleteSql = `DELETE FROM ${fkTable} WHERE ${whereClause}`;
+                                    const cascadeStmt = connection.prepare(cascadeDeleteSql);
+                                    cascadeStmt.run(...Object.values(condition));
+                                }
+                            }
+                            // Delete from main table
+                            const whereClause = Object.keys(condition)
+                                .map(key => `${key} = ?`)
+                                .join(' AND ');
+                            const deleteSql = `DELETE FROM ${data.table} WHERE ${whereClause}`;
+                            const stmt = connection.prepare(deleteSql);
+                            const result = stmt.run(...Object.values(condition));
+                            if (result.changes > 0) {
+                                progress.successfulRecords++;
+                            }
+                            else {
+                                progress.failedRecords++;
+                                progress.errors.push({
+                                    recordIndex,
+                                    record: condition,
+                                    error: 'No rows affected - record may not exist',
+                                    timestamp: new Date()
+                                });
+                            }
+                        }
+                        catch (error) {
+                            progress.failedRecords++;
+                            progress.errors.push({
+                                recordIndex,
+                                record: condition,
+                                error: error.message,
+                                timestamp: new Date()
+                            });
+                            if (!continueOnError) {
+                                throw error;
+                            }
+                        }
+                        progress.processedRecords++;
+                        if (data.options?.progressCallback) {
+                            const elapsed = Date.now() - startTime.getTime();
+                            const recordsPerMs = progress.processedRecords / elapsed;
+                            const remainingRecords = progress.totalRecords - progress.processedRecords;
+                            progress.estimatedTimeRemaining = remainingRecords / recordsPerMs;
+                            data.options.progressCallback(progress);
+                        }
+                    }
+                }
+            });
+            transaction();
+            const executionTime = Date.now() - startTime.getTime();
+            return {
+                success: progress.failedRecords === 0 || continueOnError,
+                progress,
+                executionTime,
+                summary: {
+                    totalRecords: progress.totalRecords,
+                    successfulRecords: progress.successfulRecords,
+                    failedRecords: progress.failedRecords,
+                    affectedTables: Array.from(affectedTables)
+                }
+            };
+        }
+        catch (error) {
+            this.logger.error('Bulk delete failed', { error: error.message });
+            throw error;
+        }
+        finally {
+            this.returnConnection(connection);
+        }
+    }
+    /**
      * Close all database connections
      */
     close() {

@@ -222,6 +222,105 @@ class MCPSQLiteServer {
                     required: ['path']
                 },
                 requiredPermissions: ['utility']
+            },
+            {
+                name: 'sqlite_bulk_insert',
+                description: 'Bulk insert data with relational support and progress tracking',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        mainTable: {
+                            type: 'string',
+                            description: 'Main table name to insert into'
+                        },
+                        records: {
+                            type: 'array',
+                            description: 'Array of records to insert',
+                            items: { type: 'object' }
+                        },
+                        relatedData: {
+                            type: 'object',
+                            description: 'Related table data with foreign key mappings'
+                        },
+                        options: {
+                            type: 'object',
+                            description: 'Bulk insert options',
+                            properties: {
+                                batchSize: { type: 'number', description: 'Batch size for processing' },
+                                continueOnError: { type: 'boolean', description: 'Continue processing on errors' },
+                                validateForeignKeys: { type: 'boolean', description: 'Validate foreign key constraints' },
+                                insertRelatedData: { type: 'boolean', description: 'Insert related table data first' }
+                            }
+                        }
+                    },
+                    required: ['mainTable', 'records']
+                },
+                requiredPermissions: ['create']
+            },
+            {
+                name: 'sqlite_bulk_update',
+                description: 'Bulk update data with progress tracking',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        table: {
+                            type: 'string',
+                            description: 'Table name to update'
+                        },
+                        updates: {
+                            type: 'array',
+                            description: 'Array of update operations',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    data: { type: 'object', description: 'Data to update' },
+                                    where: { type: 'object', description: 'WHERE conditions' }
+                                },
+                                required: ['data', 'where']
+                            }
+                        },
+                        options: {
+                            type: 'object',
+                            description: 'Bulk update options',
+                            properties: {
+                                batchSize: { type: 'number', description: 'Batch size for processing' },
+                                continueOnError: { type: 'boolean', description: 'Continue processing on errors' },
+                                validateForeignKeys: { type: 'boolean', description: 'Validate foreign key constraints' }
+                            }
+                        }
+                    },
+                    required: ['table', 'updates']
+                },
+                requiredPermissions: ['update']
+            },
+            {
+                name: 'sqlite_bulk_delete',
+                description: 'Bulk delete data with cascading support and progress tracking',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        table: {
+                            type: 'string',
+                            description: 'Table name to delete from'
+                        },
+                        conditions: {
+                            type: 'array',
+                            description: 'Array of WHERE conditions for deletion',
+                            items: { type: 'object' }
+                        },
+                        options: {
+                            type: 'object',
+                            description: 'Bulk delete options',
+                            properties: {
+                                batchSize: { type: 'number', description: 'Batch size for processing' },
+                                continueOnError: { type: 'boolean', description: 'Continue processing on errors' },
+                                cascadeDelete: { type: 'boolean', description: 'Enable cascade delete for related records' }
+                            }
+                        }
+                    },
+                    required: ['table', 'conditions']
+                },
+                requiredPermissions: ['delete']
             }
         ];
         // Convert to MCP Tool format
@@ -254,6 +353,12 @@ class MCPSQLiteServer {
                 return this.handleTransaction(args, clientId, clientPermissions);
             case 'sqlite_backup':
                 return this.handleBackup(args, clientId, clientPermissions);
+            case 'sqlite_bulk_insert':
+                return this.handleBulkInsert(args, clientId, clientPermissions);
+            case 'sqlite_bulk_update':
+                return this.handleBulkUpdate(args, clientId, clientPermissions);
+            case 'sqlite_bulk_delete':
+                return this.handleBulkDelete(args, clientId, clientPermissions);
             default:
                 throw new Error(`Unknown tool: ${toolName}`);
         }
@@ -507,6 +612,122 @@ class MCPSQLiteServer {
         }
         catch (error) {
             throw new Error(`Backup failed: ${error.message}`);
+        }
+    }
+    /**
+     * Handle bulk insert operation
+     */
+    async handleBulkInsert(args, clientId, permissions) {
+        const { mainTable, records, relatedData = {}, options = {} } = args;
+        // Check permissions
+        if (!permissions.includes('create')) {
+            throw new Error('Insufficient permissions for bulk insert operation');
+        }
+        try {
+            const result = await this.databaseManager.bulkInsert({
+                mainTable,
+                records,
+                relatedData,
+                options
+            });
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify({
+                            success: result.success,
+                            executionTime: result.executionTime,
+                            summary: {
+                                totalRecords: result.summary.totalRecords,
+                                successfulRecords: result.summary.successfulRecords,
+                                failedRecords: result.summary.failedRecords,
+                                errors: result.progress.errors,
+                                affectedTables: result.summary.affectedTables
+                            },
+                            progress: result.progress
+                        }, null, 2)
+                    }
+                ]
+            };
+        }
+        catch (error) {
+            throw new Error(`Bulk insert failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Handle bulk update operation
+     */
+    async handleBulkUpdate(args, clientId, permissions) {
+        const { table, updates, options = {} } = args;
+        // Check permissions
+        if (!permissions.includes('update')) {
+            throw new Error('Insufficient permissions for bulk update operation');
+        }
+        try {
+            const result = await this.databaseManager.bulkUpdate({
+                table,
+                updates,
+                options
+            });
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify({
+                            success: result.success,
+                            executionTime: result.executionTime,
+                            summary: {
+                                totalRecords: result.summary.totalRecords,
+                                successfulRecords: result.summary.successfulRecords,
+                                failedRecords: result.summary.failedRecords,
+                                errors: result.progress.errors
+                            },
+                            progress: result.progress
+                        }, null, 2)
+                    }
+                ]
+            };
+        }
+        catch (error) {
+            throw new Error(`Bulk update failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Handle bulk delete operation
+     */
+    async handleBulkDelete(args, clientId, permissions) {
+        const { table, conditions, options = {} } = args;
+        // Check permissions
+        if (!permissions.includes('delete')) {
+            throw new Error('Insufficient permissions for bulk delete operation');
+        }
+        try {
+            const result = await this.databaseManager.bulkDelete({
+                table: table,
+                conditions,
+                options
+            });
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify({
+                            success: result.success,
+                            executionTime: result.executionTime,
+                            summary: {
+                                totalRecords: result.summary.totalRecords,
+                                successfulRecords: result.summary.successfulRecords,
+                                failedRecords: result.summary.failedRecords,
+                                errors: result.progress.errors
+                            },
+                            progress: result.progress
+                        }, null, 2)
+                    }
+                ]
+            };
+        }
+        catch (error) {
+            throw new Error(`Bulk delete failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
     /**

@@ -2,7 +2,7 @@
  * Database layer for SQLite MCP Server
  * Provides connection pooling, query execution, and schema management
  */
-import { DatabaseConfig, QueryResult, SchemaInfo, ConnectionPoolStats } from '../types';
+import { DatabaseConfig, QueryResult, SchemaInfo, ConnectionPoolStats, BulkOperationResult, BulkInsertData, BulkUpdateData, BulkDeleteData } from '../types';
 import { Logger } from 'winston';
 export declare class DatabaseManager {
     private static instance;
@@ -97,6 +97,18 @@ export declare class DatabaseManager {
      * Backup database to file
      */
     backupDatabase(backupPath: string): Promise<void>;
+    /**
+     * Bulk insert operation with relational data support
+     */
+    bulkInsert(data: BulkInsertData): Promise<BulkOperationResult>;
+    /**
+     * Bulk update operation with progress tracking
+     */
+    bulkUpdate(data: BulkUpdateData): Promise<BulkOperationResult>;
+    /**
+     * Bulk delete operation with cascading support
+     */
+    bulkDelete(data: BulkDeleteData): Promise<BulkOperationResult>;
     /**
      * Close all database connections
      */
