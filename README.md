@@ -97,7 +97,172 @@ sqlite://:memory:
 ```
 
 ### Permission Combinations
-Common permission combinations for different use cases:
+
+#### Detailed Permission Descriptions
+
+<table>
+<thead>
+<tr>
+<th>Permission</th>
+<th>Description</th>
+<th>Allowed Operations</th>
+<th>Example Use Cases</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>list</code></td>
+<td>View database structure and metadata</td>
+<td>
+• List all tables<br>
+• View table schemas<br>
+• Check column information<br>
+• View indexes and constraints<br>
+• Access database metadata
+</td>
+<td>
+• Database exploration<br>
+• Schema documentation<br>
+• Development planning<br>
+• Data modeling
+</td>
+</tr>
+<tr>
+<td><code>read</code></td>
+<td>Execute SELECT queries and retrieve data</td>
+<td>
+• SELECT statements<br>
+• JOIN operations<br>
+• Aggregate functions (COUNT, SUM, etc.)<br>
+• Subqueries<br>
+• View data content
+</td>
+<td>
+• Data analysis<br>
+• Reporting<br>
+• Business intelligence<br>
+• Read-only applications
+</td>
+</tr>
+<tr>
+<td><code>create</code></td>
+<td>Insert new records into tables</td>
+<td>
+• INSERT statements<br>
+• Bulk insert operations<br>
+• Add new rows<br>
+• Populate tables with data
+</td>
+<td>
+• Data entry applications<br>
+• ETL processes<br>
+• User registration<br>
+• Content creation
+</td>
+</tr>
+<tr>
+<td><code>update</code></td>
+<td>Modify existing records</td>
+<td>
+• UPDATE statements<br>
+• Bulk update operations<br>
+• Modify existing data<br>
+• Change field values
+</td>
+<td>
+• Profile updates<br>
+• Status changes<br>
+• Data corrections<br>
+• Content editing
+</td>
+</tr>
+<tr>
+<td><code>delete</code></td>
+<td>Remove records from tables</td>
+<td>
+• DELETE statements<br>
+• Bulk delete operations<br>
+• Remove rows<br>
+• Data cleanup
+</td>
+<td>
+• User account deletion<br>
+• Data archiving<br>
+• Content removal<br>
+• Cleanup operations
+</td>
+</tr>
+<tr>
+<td><code>execute</code></td>
+<td>Run stored procedures and functions</td>
+<td>
+• Execute stored procedures<br>
+• Call database functions<br>
+• Run custom database logic<br>
+• Execute complex operations
+</td>
+<td>
+• Business logic execution<br>
+• Complex calculations<br>
+• Batch processing<br>
+• Custom workflows
+</td>
+</tr>
+<tr>
+<td><code>ddl</code></td>
+<td>Modify database structure</td>
+<td>
+• CREATE TABLE/INDEX<br>
+• ALTER TABLE structure<br>
+• DROP tables/indexes<br>
+• Modify schema<br>
+• Create/drop views
+</td>
+<td>
+• Database migrations<br>
+• Schema updates<br>
+• Development setup<br>
+• Structure modifications
+</td>
+</tr>
+<tr>
+<td><code>transaction</code></td>
+<td>Control transaction boundaries</td>
+<td>
+• BEGIN transactions<br>
+• COMMIT changes<br>
+• ROLLBACK operations<br>
+• Manage data consistency<br>
+• Atomic operations
+</td>
+<td>
+• Financial operations<br>
+• Data integrity<br>
+• Batch processing<br>
+• Critical updates
+</td>
+</tr>
+<tr>
+<td><code>utility</code></td>
+<td>Perform maintenance and optimization</td>
+<td>
+• VACUUM database<br>
+• ANALYZE statistics<br>
+• PRAGMA commands<br>
+• Database backup<br>
+• Performance optimization
+</td>
+<td>
+• Database maintenance<br>
+• Performance tuning<br>
+• Backup operations<br>
+• System administration
+</td>
+</tr>
+</tbody>
+</table>
+
+#### Common permission combinations for different use cases:
 
 ```bash
 # Read-only access
