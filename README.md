@@ -570,6 +570,7 @@ The server automatically blocks or restricts:
 - ✅ **CLI Interface**: Command-line interface with comprehensive options
 - ✅ **Connection Pooling**: Efficient database connection management
 - ✅ **Audit Logging**: Detailed operation logging for compliance
+- ✅ **Bulk Operations**: Enhanced bulk insert/update/delete with progress tracking
 
 ### ✅ Version 1.0.1 - Auto-Creation & Documentation (Completed)
 - ✅ **Database Auto-Creation**: Automatic database file creation
@@ -588,7 +589,6 @@ The server automatically blocks or restricts:
 ### 📋 Version 1.2.0 - Data Management & Migration (Q2 2025)
 - [ ] **Database Migration Tools**: Schema versioning and migration management
 - [ ] **Data Import/Export**: Support for CSV, JSON, XML data import/export
-- ✅ **Bulk Operations**: Enhanced bulk insert/update/delete with progress tracking
 - [ ] **Data Validation**: Custom validation rules and constraints
 - [ ] **Backup Scheduling**: Automated backup scheduling with retention policies
 
