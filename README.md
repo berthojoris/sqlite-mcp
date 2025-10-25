@@ -629,6 +629,13 @@ For issues, questions, or contributions:
 
 ## 🔄 Version History
 
+### v1.1.1
+- **Bulk Operations**: Advanced bulk insert, update, and delete operations with progress tracking
+- **Relational Data Support**: Bulk insert with foreign key mappings and related table data
+- **Progress Tracking**: Real-time progress monitoring for bulk operations with error handling
+- **Performance Optimization**: Batch processing with configurable batch sizes for large datasets
+- **Enhanced Error Handling**: Improved error reporting and continue-on-error options for bulk operations
+
 ### v1.0.1
 - **Auto-Creation Features**: Database and directory auto-creation functionality
 - **Enhanced Logging**: Improved initialization logging with database status
