@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.6] - 2025-12-20
+
+### Improved
+- **Tool Descriptions**: Enhanced all 12 MCP tool descriptions with detailed explanations, usage guidance, examples, and return value information
+- **Parameter Documentation**: Added concrete examples for all input parameters (e.g., table names, query syntax, WHERE conditions)
+- **Tool Selection Guidance**: Added context about when to use each tool vs alternatives (e.g., sqlite_insert vs sqlite_bulk_insert)
+- **Default Value Documentation**: Clarified default values for optional parameters in bulk operations and DDL
+
+## [1.1.5] - 2025-12-20
+
+### Fixed
+- **SQL Injection Vulnerability**: Added proper validation and escaping for table and column names in INSERT, UPDATE, DELETE, and DDL operations using new `safeIdentifier` utility function
+- **Backup Function**: Fixed incorrect better-sqlite3 backup API usage
+- **DatabaseManager Singleton**: Changed from single instance to Map-based instances keyed by database path to support multiple database connections
+- **Version Mismatch**: Updated hardcoded server version in mcp-server.ts to match package.json
+- **Package Scripts**: Fixed incorrect CLI paths in package.json start and dev scripts
+- **Parameter Sanitization**: Removed over-aggressive character stripping that broke legitimate data; SQLite parameterized queries handle escaping automatically
+- **Permission Check**: Added fallback to default client permissions and explicit error when no permissions are configured
+
+### Changed
+- Removed unused tsconfig path alias (`@/*`) that required additional tooling to work
+
 ## [1.1.4] - 2025-12-20
 
 ### Changed

@@ -19,6 +19,7 @@ import { SecurityManager } from '../security';
 import { ConfigManager } from '../config';
 import { Logger } from 'winston';
 import { PermissionType, QueryResult, SchemaInfo, MCPToolDefinition } from '../types';
+import { safeIdentifier } from '../utils';
 
 export class MCPSQLiteServer {
   private server: Server;
@@ -43,7 +44,7 @@ export class MCPSQLiteServer {
     this.server = new Server(
       {
         name: 'sqlite-mcp-server',
-        version: '1.0.0',
+        version: '1.1.6',
         description: 'SQLite database server implementing the Model Context Protocol'
       },
       {
@@ -117,17 +118,17 @@ export class MCPSQLiteServer {
     const tools: MCPToolDefinition[] = [
       {
         name: 'sqlite_query',
-        description: 'Execute a SQL query on the SQLite database',
+        description: 'Execute a raw SQL query on the SQLite database. Use this for SELECT queries, complex joins, aggregations, or any custom SQL. For simple CRUD operations, prefer the dedicated insert/update/delete tools. Returns query results as JSON array for SELECT, or affected row count for other statements.',
         inputSchema: {
           type: 'object',
           properties: {
             query: {
               type: 'string',
-              description: 'SQL query to execute'
+              description: 'SQL query to execute. Use ? placeholders for parameters. Example: "SELECT * FROM users WHERE age > ? AND status = ?"'
             },
             parameters: {
               type: 'array',
-              description: 'Parameters for the SQL query',
+              description: 'Values for query placeholders in order. Example: [25, "active"] for the query above',
               items: { type: 'string' }
             }
           },
@@ -137,17 +138,17 @@ export class MCPSQLiteServer {
       },
       {
         name: 'sqlite_insert',
-        description: 'Insert data into a SQLite table',
+        description: 'Insert a single row into a SQLite table. For inserting multiple rows efficiently, use sqlite_bulk_insert instead. Returns the lastInsertRowid and number of affected rows.',
         inputSchema: {
           type: 'object',
           properties: {
             table: {
               type: 'string',
-              description: 'Table name to insert into'
+              description: 'Target table name. Example: "users"'
             },
             data: {
               type: 'object',
-              description: 'Data to insert as key-value pairs'
+              description: 'Column-value pairs to insert. Example: {"name": "John", "email": "john@example.com", "age": 30}'
             }
           },
           required: ['table', 'data']
@@ -156,21 +157,21 @@ export class MCPSQLiteServer {
       },
       {
         name: 'sqlite_update',
-        description: 'Update data in a SQLite table',
+        description: 'Update existing rows in a SQLite table matching the WHERE conditions. All conditions are combined with AND. For updating multiple rows with different values, use sqlite_bulk_update. Returns the number of affected rows.',
         inputSchema: {
           type: 'object',
           properties: {
             table: {
               type: 'string',
-              description: 'Table name to update'
+              description: 'Target table name. Example: "users"'
             },
             data: {
               type: 'object',
-              description: 'Data to update as key-value pairs'
+              description: 'Column-value pairs to update. Example: {"status": "inactive", "updated_at": "2024-01-15"}'
             },
             where: {
               type: 'object',
-              description: 'WHERE conditions as key-value pairs'
+              description: 'WHERE conditions as column-value pairs (combined with AND). Example: {"id": 123} or {"status": "active", "role": "admin"}'
             }
           },
           required: ['table', 'data', 'where']
@@ -179,17 +180,17 @@ export class MCPSQLiteServer {
       },
       {
         name: 'sqlite_delete',
-        description: 'Delete data from a SQLite table',
+        description: 'Delete rows from a SQLite table matching the WHERE conditions. All conditions are combined with AND. For deleting multiple sets of conditions or with cascade support, use sqlite_bulk_delete. Returns the number of deleted rows.',
         inputSchema: {
           type: 'object',
           properties: {
             table: {
               type: 'string',
-              description: 'Table name to delete from'
+              description: 'Target table name. Example: "users"'
             },
             where: {
               type: 'object',
-              description: 'WHERE conditions as key-value pairs'
+              description: 'WHERE conditions as column-value pairs (combined with AND). Example: {"id": 123} or {"status": "deleted", "created_at": "2023-01-01"}'
             }
           },
           required: ['table', 'where']
@@ -198,13 +199,13 @@ export class MCPSQLiteServer {
       },
       {
         name: 'sqlite_schema',
-        description: 'Get database schema information',
+        description: 'Retrieve detailed schema information including tables, columns, data types, primary keys, foreign keys, indexes, views, and triggers. Use this to understand database structure before writing queries. Optionally filter by specific table name.',
         inputSchema: {
           type: 'object',
           properties: {
             table: {
               type: 'string',
-              description: 'Specific table name (optional)'
+              description: 'Filter schema info for a specific table name. If omitted, returns schema for all tables.'
             }
           }
         },
@@ -212,7 +213,7 @@ export class MCPSQLiteServer {
       },
       {
         name: 'sqlite_tables',
-        description: 'List all tables in the database',
+        description: 'Get a quick list of all tables in the database with basic info (name, type, column count). Use this for a fast overview; use sqlite_schema for detailed column and constraint information.',
         inputSchema: {
           type: 'object',
           properties: {}
@@ -221,18 +222,18 @@ export class MCPSQLiteServer {
       },
       {
         name: 'sqlite_transaction',
-        description: 'Execute multiple queries in a transaction',
+        description: 'Execute multiple SQL queries atomically in a single transaction. If any query fails, all changes are rolled back. Use this when you need to ensure data consistency across multiple operations (e.g., transferring funds between accounts).',
         inputSchema: {
           type: 'object',
           properties: {
             queries: {
               type: 'array',
-              description: 'Array of queries to execute in transaction',
+              description: 'Array of queries to execute atomically. Example: [{"query": "UPDATE accounts SET balance = balance - 100 WHERE id = ?", "parameters": ["1"]}, {"query": "UPDATE accounts SET balance = balance + 100 WHERE id = ?", "parameters": ["2"]}]',
               items: {
                 type: 'object',
                 properties: {
-                  query: { type: 'string' },
-                  parameters: { type: 'array', items: { type: 'string' } }
+                  query: { type: 'string', description: 'SQL query with ? placeholders' },
+                  parameters: { type: 'array', items: { type: 'string' }, description: 'Parameter values for placeholders' }
                 },
                 required: ['query']
               }
@@ -244,13 +245,13 @@ export class MCPSQLiteServer {
       },
       {
         name: 'sqlite_backup',
-        description: 'Create a backup of the database',
+        description: 'Create a complete backup copy of the database to a specified file path. The backup is consistent and can be used to restore the database later. Returns success status and timestamp.',
         inputSchema: {
           type: 'object',
           properties: {
             path: {
               type: 'string',
-              description: 'Backup file path'
+              description: 'Full file path for the backup. Example: "/backups/mydb_2024-01-15.sqlite" or "C:\\backups\\mydb_backup.sqlite"'
             }
           },
           required: ['path']
@@ -259,31 +260,31 @@ export class MCPSQLiteServer {
       },
       {
         name: 'sqlite_bulk_insert',
-        description: 'Bulk insert data with relational support and progress tracking',
+        description: 'Insert multiple rows efficiently in batches with progress tracking. Supports relational data insertion with automatic foreign key mapping. Use this instead of multiple sqlite_insert calls for better performance. Returns detailed progress with success/failure counts.',
         inputSchema: {
           type: 'object',
           properties: {
             mainTable: {
               type: 'string',
-              description: 'Main table name to insert into'
+              description: 'Target table name for the main records. Example: "orders"'
             },
             records: {
               type: 'array',
-              description: 'Array of records to insert',
+              description: 'Array of row objects to insert. Example: [{"customer_id": 1, "total": 99.99}, {"customer_id": 2, "total": 149.50}]',
               items: { type: 'object' }
             },
             relatedData: {
               type: 'object',
-              description: 'Related table data with foreign key mappings'
+              description: 'Optional related table data with foreign key mappings for hierarchical inserts'
             },
             options: {
               type: 'object',
-              description: 'Bulk insert options',
+              description: 'Bulk operation options',
               properties: {
-                batchSize: { type: 'number', description: 'Batch size for processing' },
-                continueOnError: { type: 'boolean', description: 'Continue processing on errors' },
-                validateForeignKeys: { type: 'boolean', description: 'Validate foreign key constraints' },
-                insertRelatedData: { type: 'boolean', description: 'Insert related table data first' }
+                batchSize: { type: 'number', description: 'Number of records per batch (default: 1000). Lower values use less memory.' },
+                continueOnError: { type: 'boolean', description: 'If true, continue processing remaining records when one fails (default: false)' },
+                validateForeignKeys: { type: 'boolean', description: 'Validate foreign key constraints before insert (default: false)' },
+                insertRelatedData: { type: 'boolean', description: 'Insert related table data first and map foreign keys (default: false)' }
               }
             }
           },
@@ -293,33 +294,33 @@ export class MCPSQLiteServer {
       },
       {
         name: 'sqlite_bulk_update',
-        description: 'Bulk update data with progress tracking',
+        description: 'Update multiple rows with different values efficiently in batches. Each update operation specifies its own data and WHERE conditions. Use this instead of multiple sqlite_update calls for better performance. Returns detailed progress with success/failure counts.',
         inputSchema: {
           type: 'object',
           properties: {
             table: {
               type: 'string',
-              description: 'Table name to update'
+              description: 'Target table name. Example: "products"'
             },
             updates: {
               type: 'array',
-              description: 'Array of update operations',
+              description: 'Array of update operations, each with data to set and WHERE conditions. Example: [{"data": {"price": 29.99}, "where": {"id": 1}}, {"data": {"price": 39.99}, "where": {"id": 2}}]',
               items: {
                 type: 'object',
                 properties: {
-                  data: { type: 'object', description: 'Data to update' },
-                  where: { type: 'object', description: 'WHERE conditions' }
+                  data: { type: 'object', description: 'Column-value pairs to update' },
+                  where: { type: 'object', description: 'WHERE conditions to identify the row(s)' }
                 },
                 required: ['data', 'where']
               }
             },
             options: {
               type: 'object',
-              description: 'Bulk update options',
+              description: 'Bulk operation options',
               properties: {
-                batchSize: { type: 'number', description: 'Batch size for processing' },
-                continueOnError: { type: 'boolean', description: 'Continue processing on errors' },
-                validateForeignKeys: { type: 'boolean', description: 'Validate foreign key constraints' }
+                batchSize: { type: 'number', description: 'Number of updates per batch (default: 1000)' },
+                continueOnError: { type: 'boolean', description: 'If true, continue processing when an update fails (default: false)' },
+                validateForeignKeys: { type: 'boolean', description: 'Validate foreign key constraints (default: false)' }
               }
             }
           },
@@ -329,26 +330,26 @@ export class MCPSQLiteServer {
       },
       {
         name: 'sqlite_bulk_delete',
-        description: 'Bulk delete data with cascading support and progress tracking',
+        description: 'Delete multiple sets of rows efficiently in batches with optional cascade support. Each condition set identifies rows to delete. Use this for mass deletion operations with progress tracking. Returns detailed progress with success/failure counts.',
         inputSchema: {
           type: 'object',
           properties: {
             table: {
               type: 'string',
-              description: 'Table name to delete from'
+              description: 'Target table name. Example: "logs"'
             },
             conditions: {
               type: 'array',
-              description: 'Array of WHERE conditions for deletion',
+              description: 'Array of WHERE condition sets. Each set deletes matching rows. Example: [{"user_id": 1}, {"user_id": 2}, {"created_at": "2023-01-01"}]',
               items: { type: 'object' }
             },
             options: {
               type: 'object',
-              description: 'Bulk delete options',
+              description: 'Bulk operation options',
               properties: {
-                batchSize: { type: 'number', description: 'Batch size for processing' },
-                continueOnError: { type: 'boolean', description: 'Continue processing on errors' },
-                cascadeDelete: { type: 'boolean', description: 'Enable cascade delete for related records' }
+                batchSize: { type: 'number', description: 'Number of delete operations per batch (default: 1000)' },
+                continueOnError: { type: 'boolean', description: 'If true, continue processing when a delete fails (default: false)' },
+                cascadeDelete: { type: 'boolean', description: 'If true, also delete related records in child tables (default: false)' }
               }
             }
           },
@@ -358,40 +359,40 @@ export class MCPSQLiteServer {
       },
       {
         name: 'sqlite_ddl',
-        description: 'Execute DDL (Data Definition Language) operations for schema management',
+        description: 'Execute Data Definition Language (DDL) operations to modify database schema. Supports: create_table (with columns, constraints, foreign keys), drop_table, alter_table (add/rename column, rename table), create_index, drop_index. Use sqlite_schema first to understand existing structure.',
         inputSchema: {
           type: 'object',
           properties: {
             operation: {
               type: 'string',
               enum: ['create_table', 'drop_table', 'alter_table', 'create_index', 'drop_index'],
-              description: 'DDL operation to perform'
+              description: 'DDL operation type: create_table, drop_table, alter_table, create_index, or drop_index'
             },
             table: {
               type: 'string',
-              description: 'Table name'
+              description: 'Table name to operate on. Example: "users"'
             },
             columns: {
               type: 'array',
-              description: 'Column definitions for create_table',
+              description: 'Column definitions for create_table. Required for create_table operation.',
               items: {
                 type: 'object',
                 properties: {
-                  name: { type: 'string', description: 'Column name' },
-                  type: { type: 'string', description: 'Column data type (TEXT, INTEGER, REAL, BLOB, etc.)' },
-                  primaryKey: { type: 'boolean', description: 'Is primary key' },
-                  autoIncrement: { type: 'boolean', description: 'Auto increment (only for INTEGER PRIMARY KEY)' },
-                  notNull: { type: 'boolean', description: 'NOT NULL constraint' },
-                  unique: { type: 'boolean', description: 'UNIQUE constraint' },
-                  defaultValue: { type: 'string', description: 'Default value' },
+                  name: { type: 'string', description: 'Column name. Example: "user_id"' },
+                  type: { type: 'string', description: 'SQLite data type: TEXT, INTEGER, REAL, BLOB, or NUMERIC' },
+                  primaryKey: { type: 'boolean', description: 'Set as PRIMARY KEY (default: false)' },
+                  autoIncrement: { type: 'boolean', description: 'Enable AUTOINCREMENT (only valid for INTEGER PRIMARY KEY)' },
+                  notNull: { type: 'boolean', description: 'Add NOT NULL constraint (default: false)' },
+                  unique: { type: 'boolean', description: 'Add UNIQUE constraint (default: false)' },
+                  defaultValue: { type: 'string', description: 'Default value expression. Example: "0" or "CURRENT_TIMESTAMP"' },
                   foreignKey: {
                     type: 'object',
-                    description: 'Foreign key reference',
+                    description: 'Foreign key reference to another table',
                     properties: {
-                      table: { type: 'string' },
-                      column: { type: 'string' },
-                      onDelete: { type: 'string', enum: ['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION'] },
-                      onUpdate: { type: 'string', enum: ['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION'] }
+                      table: { type: 'string', description: 'Referenced table name' },
+                      column: { type: 'string', description: 'Referenced column name' },
+                      onDelete: { type: 'string', enum: ['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION'], description: 'Action on parent delete' },
+                      onUpdate: { type: 'string', enum: ['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION'], description: 'Action on parent update' }
                     }
                   }
                 },
@@ -400,31 +401,31 @@ export class MCPSQLiteServer {
             },
             alterAction: {
               type: 'object',
-              description: 'Alter table action',
+              description: 'Alter table action configuration. Required for alter_table operation.',
               properties: {
-                action: { type: 'string', enum: ['add_column', 'rename_table', 'rename_column'] },
-                column: { type: 'object', description: 'Column definition for add_column' },
-                newName: { type: 'string', description: 'New name for rename operations' },
-                oldColumnName: { type: 'string', description: 'Old column name for rename_column' }
+                action: { type: 'string', enum: ['add_column', 'rename_table', 'rename_column'], description: 'Type of alteration' },
+                column: { type: 'object', description: 'Column definition for add_column (same format as columns array items)' },
+                newName: { type: 'string', description: 'New name for rename_table or rename_column' },
+                oldColumnName: { type: 'string', description: 'Current column name for rename_column' }
               }
             },
             index: {
               type: 'object',
-              description: 'Index definition',
+              description: 'Index configuration for create_index or drop_index operations.',
               properties: {
-                name: { type: 'string', description: 'Index name' },
-                columns: { type: 'array', items: { type: 'string' }, description: 'Columns to index' },
-                unique: { type: 'boolean', description: 'Create unique index' }
+                name: { type: 'string', description: 'Index name. Example: "idx_users_email"' },
+                columns: { type: 'array', items: { type: 'string' }, description: 'Columns to index. Example: ["email"] or ["last_name", "first_name"]' },
+                unique: { type: 'boolean', description: 'Create as UNIQUE index to enforce uniqueness (default: false)' }
               }
             },
             ifNotExists: {
               type: 'boolean',
-              description: 'Add IF NOT EXISTS clause',
+              description: 'Add IF NOT EXISTS clause to prevent errors if object already exists (default: false)',
               default: false
             },
             ifExists: {
               type: 'boolean',
-              description: 'Add IF EXISTS clause for drop operations',
+              description: 'Add IF EXISTS clause for drop operations to prevent errors if object does not exist (default: false)',
               default: false
             }
           },
@@ -450,8 +451,18 @@ export class MCPSQLiteServer {
     args: Record<string, any>, 
     clientId: string
   ): Promise<CallToolResult> {
-    // Check permissions
-    const clientPermissions = this.clientPermissions.get(clientId) || [];
+    // Check permissions - use 'default' client permissions if specific client not found
+    let clientPermissions = this.clientPermissions.get(clientId);
+    
+    if (!clientPermissions) {
+      // Fall back to default client permissions
+      clientPermissions = this.clientPermissions.get('default') || [];
+      this.logger.debug('Using default permissions for unknown client', { clientId });
+    }
+    
+    if (clientPermissions.length === 0) {
+      throw new Error(`No permissions configured for client: ${clientId}`);
+    }
     
     switch (toolName) {
       case 'sqlite_query':
@@ -552,10 +563,16 @@ export class MCPSQLiteServer {
       throw new Error('Insufficient permissions for insert operation');
     }
 
-    // Build INSERT query
+    // Validate and escape table name
+    const safeTable = safeIdentifier(table, 'table name');
+    
+    // Validate and escape column names
     const columns = Object.keys(data);
+    const safeColumns = columns.map(col => safeIdentifier(col, 'column name'));
+    
+    // Build INSERT query with safe identifiers
     const placeholders = columns.map(() => '?').join(', ');
-    const query = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`;
+    const query = `INSERT INTO ${safeTable} (${safeColumns.join(', ')}) VALUES (${placeholders})`;
     const parameters = Object.values(data);
 
     // Validate query
@@ -600,10 +617,17 @@ export class MCPSQLiteServer {
       throw new Error('Insufficient permissions for update operation');
     }
 
-    // Build UPDATE query
-    const setClause = Object.keys(data).map(key => `${key} = ?`).join(', ');
-    const whereClause = Object.keys(where).map(key => `${key} = ?`).join(' AND ');
-    const query = `UPDATE ${table} SET ${setClause} WHERE ${whereClause}`;
+    // Validate and escape table name
+    const safeTable = safeIdentifier(table, 'table name');
+    
+    // Validate and escape column names in SET clause
+    const setClause = Object.keys(data).map(key => `${safeIdentifier(key, 'column name')} = ?`).join(', ');
+    
+    // Validate and escape column names in WHERE clause
+    const whereClause = Object.keys(where).map(key => `${safeIdentifier(key, 'column name')} = ?`).join(' AND ');
+    
+    // Build UPDATE query with safe identifiers
+    const query = `UPDATE ${safeTable} SET ${setClause} WHERE ${whereClause}`;
     const parameters = [...Object.values(data), ...Object.values(where)];
 
     // Validate query
@@ -647,9 +671,14 @@ export class MCPSQLiteServer {
       throw new Error('Insufficient permissions for delete operation');
     }
 
-    // Build DELETE query
-    const whereClause = Object.keys(where).map(key => `${key} = ?`).join(' AND ');
-    const query = `DELETE FROM ${table} WHERE ${whereClause}`;
+    // Validate and escape table name
+    const safeTable = safeIdentifier(table, 'table name');
+    
+    // Validate and escape column names in WHERE clause
+    const whereClause = Object.keys(where).map(key => `${safeIdentifier(key, 'column name')} = ?`).join(' AND ');
+    
+    // Build DELETE query with safe identifiers
+    const query = `DELETE FROM ${safeTable} WHERE ${whereClause}`;
     const parameters = Object.values(where);
 
     // Validate query
@@ -978,6 +1007,9 @@ export class MCPSQLiteServer {
       throw new Error('Insufficient permissions for DDL operation');
     }
 
+    // Validate table name
+    const safeTable = safeIdentifier(table, 'table name');
+    
     let query = '';
 
     switch (operation) {
@@ -985,32 +1017,35 @@ export class MCPSQLiteServer {
         if (!columns || columns.length === 0) {
           throw new Error('Columns are required for create_table operation');
         }
-        query = this.buildCreateTableQuery(table, columns, ifNotExists);
+        query = this.buildCreateTableQuery(safeTable, columns, ifNotExists);
         break;
 
       case 'drop_table':
-        query = `DROP TABLE ${ifExists ? 'IF EXISTS ' : ''}${table}`;
+        query = `DROP TABLE ${ifExists ? 'IF EXISTS ' : ''}${safeTable}`;
         break;
 
       case 'alter_table':
         if (!alterAction) {
           throw new Error('alterAction is required for alter_table operation');
         }
-        query = this.buildAlterTableQuery(table, alterAction);
+        query = this.buildAlterTableQuery(safeTable, alterAction);
         break;
 
       case 'create_index':
         if (!index || !index.name || !index.columns) {
           throw new Error('Index name and columns are required for create_index operation');
         }
-        query = `CREATE ${index.unique ? 'UNIQUE ' : ''}INDEX ${ifNotExists ? 'IF NOT EXISTS ' : ''}${index.name} ON ${table} (${index.columns.join(', ')})`;
+        const safeIndexName = safeIdentifier(index.name, 'index name');
+        const safeIndexColumns = index.columns.map((col: string) => safeIdentifier(col, 'column name'));
+        query = `CREATE ${index.unique ? 'UNIQUE ' : ''}INDEX ${ifNotExists ? 'IF NOT EXISTS ' : ''}${safeIndexName} ON ${safeTable} (${safeIndexColumns.join(', ')})`;
         break;
 
       case 'drop_index':
         if (!index || !index.name) {
           throw new Error('Index name is required for drop_index operation');
         }
-        query = `DROP INDEX ${ifExists ? 'IF EXISTS ' : ''}${index.name}`;
+        const safeDropIndexName = safeIdentifier(index.name, 'index name');
+        query = `DROP INDEX ${ifExists ? 'IF EXISTS ' : ''}${safeDropIndexName}`;
         break;
 
       default:
@@ -1048,6 +1083,7 @@ export class MCPSQLiteServer {
 
   /**
    * Build CREATE TABLE query from column definitions
+   * Note: table parameter should already be sanitized by caller
    */
   private buildCreateTableQuery(
     table: string,
@@ -1058,7 +1094,9 @@ export class MCPSQLiteServer {
     const foreignKeys: string[] = [];
 
     for (const col of columns) {
-      let colDef = `${col.name} ${col.type}`;
+      // Validate column name
+      const safeColName = safeIdentifier(col.name, 'column name');
+      let colDef = `${safeColName} ${col.type}`;
 
       if (col.primaryKey) {
         colDef += ' PRIMARY KEY';
@@ -1083,7 +1121,9 @@ export class MCPSQLiteServer {
 
       if (col.foreignKey) {
         const fk = col.foreignKey;
-        let fkDef = `FOREIGN KEY (${col.name}) REFERENCES ${fk.table}(${fk.column})`;
+        const safeFkTable = safeIdentifier(fk.table, 'foreign key table name');
+        const safeFkColumn = safeIdentifier(fk.column, 'foreign key column name');
+        let fkDef = `FOREIGN KEY (${safeColName}) REFERENCES ${safeFkTable}(${safeFkColumn})`;
         if (fk.onDelete) {
           fkDef += ` ON DELETE ${fk.onDelete}`;
         }
@@ -1100,6 +1140,7 @@ export class MCPSQLiteServer {
 
   /**
    * Build ALTER TABLE query from action
+   * Note: table parameter should already be sanitized by caller
    */
   private buildAlterTableQuery(table: string, alterAction: any): string {
     switch (alterAction.action) {
@@ -1108,7 +1149,8 @@ export class MCPSQLiteServer {
           throw new Error('Column definition is required for add_column action');
         }
         const col = alterAction.column;
-        let colDef = `${col.name} ${col.type}`;
+        const safeColName = safeIdentifier(col.name, 'column name');
+        let colDef = `${safeColName} ${col.type}`;
         if (col.notNull) colDef += ' NOT NULL';
         if (col.defaultValue !== undefined) colDef += ` DEFAULT ${col.defaultValue}`;
         return `ALTER TABLE ${table} ADD COLUMN ${colDef}`;
@@ -1117,13 +1159,16 @@ export class MCPSQLiteServer {
         if (!alterAction.newName) {
           throw new Error('newName is required for rename_table action');
         }
-        return `ALTER TABLE ${table} RENAME TO ${alterAction.newName}`;
+        const safeNewTableName = safeIdentifier(alterAction.newName, 'new table name');
+        return `ALTER TABLE ${table} RENAME TO ${safeNewTableName}`;
 
       case 'rename_column':
         if (!alterAction.oldColumnName || !alterAction.newName) {
           throw new Error('oldColumnName and newName are required for rename_column action');
         }
-        return `ALTER TABLE ${table} RENAME COLUMN ${alterAction.oldColumnName} TO ${alterAction.newName}`;
+        const safeOldColName = safeIdentifier(alterAction.oldColumnName, 'old column name');
+        const safeNewColName = safeIdentifier(alterAction.newName, 'new column name');
+        return `ALTER TABLE ${table} RENAME COLUMN ${safeOldColName} TO ${safeNewColName}`;
 
       default:
         throw new Error(`Unknown alter action: ${alterAction.action}`);

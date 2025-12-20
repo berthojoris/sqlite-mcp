@@ -80,12 +80,38 @@ export function isValidEmail(email: string): boolean {
 }
 
 /**
+ * Validate SQL identifier (table name, column name)
+ * Returns true if the identifier is safe to use
+ */
+export function isValidIdentifier(identifier: string): boolean {
+  if (!identifier || typeof identifier !== 'string') {
+    return false;
+  }
+  // Allow only alphanumeric characters and underscores, must start with letter or underscore
+  // Max length 128 characters (reasonable limit for SQLite)
+  const validPattern = /^[a-zA-Z_][a-zA-Z0-9_]{0,127}$/;
+  return validPattern.test(identifier);
+}
+
+/**
  * Escape SQL identifier (table name, column name)
+ * Should only be used after validation with isValidIdentifier
  */
 export function escapeIdentifier(identifier: string): string {
   // Remove any existing quotes and escape internal quotes
   const cleaned = identifier.replace(/"/g, '""');
   return `"${cleaned}"`;
+}
+
+/**
+ * Validate and escape SQL identifier
+ * Throws error if identifier is invalid
+ */
+export function safeIdentifier(identifier: string, type: string = 'identifier'): string {
+  if (!isValidIdentifier(identifier)) {
+    throw new Error(`Invalid ${type}: "${identifier}". Must contain only alphanumeric characters and underscores, and start with a letter or underscore.`);
+  }
+  return escapeIdentifier(identifier);
 }
 
 /**

@@ -193,14 +193,19 @@ export class SecurityManager {
 
   /**
    * Sanitizes query parameters
+   * Note: SQLite parameterized queries handle escaping, so we only need minimal sanitization
    */
   private sanitizeParameters(parameters: any[]): any[] {
     if (!parameters) return [];
     
     return parameters.map(param => {
-      if (typeof param === 'string') {
-        // Remove potentially dangerous characters
-        return param.replace(/[<>'"&]/g, '');
+      if (param === null || param === undefined) {
+        return param;
+      }
+      // Parameterized queries in SQLite handle escaping automatically
+      // Only reject parameters that contain null bytes which can cause issues
+      if (typeof param === 'string' && param.includes('\x00')) {
+        throw new Error('Parameter contains null byte which is not allowed');
       }
       return param;
     });

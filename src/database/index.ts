@@ -24,7 +24,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 export class DatabaseManager {
-  private static instance: DatabaseManager;
+  private static instances: Map<string, DatabaseManager> = new Map();
   private db: Database.Database | null = null;
   private config: DatabaseConfig;
   private logger: Logger;
@@ -38,11 +38,39 @@ export class DatabaseManager {
     this.maxConnections = config.maxConnections || 10;
   }
 
+  /**
+   * Get or create a DatabaseManager instance for the given config
+   * Uses database path as key to allow multiple database connections
+   */
   public static getInstance(config: DatabaseConfig, logger: Logger): DatabaseManager {
-    if (!DatabaseManager.instance) {
-      DatabaseManager.instance = new DatabaseManager(config, logger);
+    const key = config.path;
+    
+    if (!DatabaseManager.instances.has(key)) {
+      DatabaseManager.instances.set(key, new DatabaseManager(config, logger));
     }
-    return DatabaseManager.instance;
+    
+    return DatabaseManager.instances.get(key)!;
+  }
+
+  /**
+   * Remove instance from cache (useful for testing or reconnecting)
+   */
+  public static removeInstance(dbPath: string): void {
+    const instance = DatabaseManager.instances.get(dbPath);
+    if (instance) {
+      instance.close();
+      DatabaseManager.instances.delete(dbPath);
+    }
+  }
+
+  /**
+   * Clear all instances
+   */
+  public static clearAllInstances(): void {
+    for (const [path, instance] of DatabaseManager.instances) {
+      instance.close();
+    }
+    DatabaseManager.instances.clear();
   }
 
   /**
@@ -542,9 +570,8 @@ export class DatabaseManager {
     }
 
     try {
-      const backupDb = new Database(backupPath);
-      (this.db as any).backup(backupDb);
-      backupDb.close();
+      // Use better-sqlite3's backup API correctly
+      await this.db.backup(backupPath);
       
       this.logger.info('Database backup completed', { backupPath });
     } catch (error) {
