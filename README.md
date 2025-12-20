@@ -19,9 +19,7 @@ A comprehensive Model Context Protocol (MCP) server implementation for SQLite da
 - [Tool Documentation](DOCUMENTATIONS.md)
 - [Permission System](#permission-system)
 - [Configuration](#-configuration)
-- [CLI Usage](#️-cli-usage)
 - [Security Guidelines](#-security-guidelines)
-- [Contributing](#-contributing)
 
 ## ⚡ Quick Start
 
@@ -159,33 +157,6 @@ Add this configuration to your MCP client's config file:
 
 # In-memory database
 "sqlite://:memory:"
-```
-
-### Special Configurations
-
-**Continue.dev** uses array format (`~/.continue/config.json`):
-```json
-{
-  "mcpServers": [
-    {
-      "name": "sqlite",
-      "command": "npx",
-      "args": ["-y", "@berthojoris/mcp-sqlite-server", "sqlite:////path/to/db.sqlite", "list,read,create,update,delete"]
-    }
-  ]
-}
-```
-
-**Cline (VS Code)** uses nested key in `settings.json`:
-```json
-{
-  "cline.mcpServers": {
-    "sqlite": {
-      "command": "npx",
-      "args": ["-y", "@berthojoris/mcp-sqlite-server", "sqlite:////path/to/db.sqlite", "list,read,create,update,delete"]
-    }
-  }
-}
 ```
 
 ### Multiple Databases
@@ -409,46 +380,6 @@ list,read,utility
 list,read,create,update,delete,ddl,transaction,utility
 ```
 
-## 🛠️ CLI Usage
-
-### Start MCP Server
-```bash
-# Basic usage
-mcp-sqlite-server sqlite:////path/to/db.sqlite list,read,utility
-
-# With additional options
-mcp-sqlite-server sqlite:////path/to/db.sqlite list,read,create,update \
-  --read-only \
-  --log-level debug \
-  --max-connections 5
-```
-
-### Schema Information
-```bash
-# View complete schema
-mcp-sqlite-server schema sqlite:////path/to/db.sqlite
-
-# View specific table
-mcp-sqlite-server schema sqlite:////path/to/db.sqlite --table users
-
-# JSON output
-mcp-sqlite-server schema sqlite:////path/to/db.sqlite --format json
-```
-
-### Database Backup
-```bash
-mcp-sqlite-server backup sqlite:////path/to/source.sqlite /path/to/backup.sqlite
-```
-
-### Generate Configuration
-```bash
-# Basic configuration
-mcp-sqlite-server config --output mcp-config.json
-
-# Template with multiple servers
-mcp-sqlite-server config --template --output mcp-template.json
-```
-
 ## 🔌 Available Tools
 
 The MCP server provides **28 powerful tools** for comprehensive SQLite database management:
@@ -546,15 +477,6 @@ The server automatically blocks or restricts:
 - Unauthorized schema modifications
 - Excessive query complexity
 - Operations without proper permissions
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass
-6. Submit a pull request
 
 ## 📄 License
 
