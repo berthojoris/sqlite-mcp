@@ -9,6 +9,7 @@
   - Add an entry to `CHANGELOG.md` for every version change.
   - Update Last Updated `README.md` with the current date and time and use format `YYYY-MM-DD HH:MM:SS`
   - Update the total tools count if there is any addition or removal of tools in `README.md`
+  - Always check and verify total tools available on this project compare to file `src/core/mcp-server.ts` and check any missing descriptions with detailed usage guidance.
 
 ## Documentation Rules
 - Do **not** create new documentation files.
