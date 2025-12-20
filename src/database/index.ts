@@ -992,6 +992,175 @@ export class DatabaseManager {
   }
 
   /**
+   * Analyze table relationships
+   */
+  public analyzeTableRelations(tableName: string, depth: number = 1, analysisType: 'incoming' | 'outgoing' | 'both' = 'both'): any {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    // Validate table name
+    if (!isValidIdentifier(tableName)) {
+      throw new Error(`Invalid table name: ${tableName}`);
+    }
+
+    try {
+      const outgoing = (analysisType === 'outgoing' || analysisType === 'both') 
+        ? this.getOutgoingRelations(tableName)
+        : [];
+
+      const incoming = (analysisType === 'incoming' || analysisType === 'both')
+        ? this.getIncomingRelations(tableName)
+        : [];
+
+      const relatedTables = new Set<string>();
+      outgoing.forEach(rel => relatedTables.add(rel.referenced_table));
+      incoming.forEach(rel => relatedTables.add(rel.source_table));
+
+      // Build relationship tree if depth > 1
+      let relationshipTree: any = {};
+      if (depth > 1) {
+        relationshipTree = this.buildRelationshipTree(tableName, depth - 1, new Set([tableName]), analysisType);
+      }
+
+      return {
+        success: true,
+        table: tableName,
+        outgoing: outgoing.map(rel => ({
+          local_column: rel.from,
+          referenced_table: rel.table,
+          referenced_column: rel.to,
+          cascade_delete: rel.on_delete === 'CASCADE',
+          cascade_update: rel.on_update === 'CASCADE',
+          on_delete: rel.on_delete,
+          on_update: rel.on_update
+        })),
+        incoming: incoming,
+        relatedTables: Array.from(relatedTables),
+        stats: {
+          totalOutgoing: outgoing.length,
+          totalIncoming: incoming.length,
+          totalRelatedTables: relatedTables.size
+        },
+        relationshipTree: depth > 1 ? relationshipTree : undefined
+      };
+    } catch (error) {
+      this.logger.error('Failed to analyze table relations', { table: tableName, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get outgoing relations (foreign keys this table references)
+   */
+  private getOutgoingRelations(tableName: string): any[] {
+    const fkQuery = `PRAGMA foreign_key_list("${tableName}")`;
+    return this.db!.prepare(fkQuery).all();
+  }
+
+  /**
+   * Get incoming relations (tables that reference this table)
+   */
+  private getIncomingRelations(tableName: string): any[] {
+    const incomingQuery = `
+      SELECT 
+        m.name as source_table,
+        fk."from" as source_column,
+        fk."to" as local_column,
+        fk.table as referenced_table,
+        fk.on_delete,
+        fk.on_update
+      FROM sqlite_master m
+      JOIN pragma_foreign_key_list(m.name) fk ON fk.table = ?
+      WHERE m.type = 'table'
+      ORDER BY m.name
+    `;
+    
+    try {
+      return this.db!.prepare(incomingQuery).all(tableName) as any[];
+    } catch (error) {
+      this.logger.debug('Could not retrieve incoming relations with pragma_foreign_key_list', { error });
+      // Fallback: manually query all tables
+      return this.getIncomingRelationsFallback(tableName);
+    }
+  }
+
+  /**
+   * Fallback method to get incoming relations if pragma_foreign_key_list is not available
+   */
+  private getIncomingRelationsFallback(tableName: string): any[] {
+    const tablesQuery = `
+      SELECT name FROM sqlite_master 
+      WHERE type = 'table' 
+      AND name NOT LIKE 'sqlite_%'
+      ORDER BY name
+    `;
+    
+    const tables = this.db!.prepare(tablesQuery).all() as Array<{ name: string }>;
+    const incoming: any[] = [];
+
+    for (const table of tables) {
+      const fkQuery = `PRAGMA foreign_key_list("${table.name}")`;
+      const foreignKeys = this.db!.prepare(fkQuery).all() as any[];
+      
+      for (const fk of foreignKeys) {
+        if (fk.table === tableName) {
+          incoming.push({
+            source_table: table.name,
+            source_column: fk.from,
+            local_column: fk.to,
+            referenced_table: fk.table,
+            on_delete: fk.on_delete,
+            on_update: fk.on_update
+          });
+        }
+      }
+    }
+
+    return incoming;
+  }
+
+  /**
+   * Build relationship tree for deep analysis
+   */
+  private buildRelationshipTree(
+    tableName: string,
+    depth: number,
+    visited: Set<string>,
+    analysisType: 'incoming' | 'outgoing' | 'both'
+  ): any {
+    if (depth <= 0 || visited.has(tableName)) {
+      return {};
+    }
+
+    visited.add(tableName);
+    const tree: any = {};
+
+    try {
+      const outgoing = this.getOutgoingRelations(tableName);
+      const incoming = this.getIncomingRelations(tableName);
+
+      if (analysisType === 'outgoing' || analysisType === 'both') {
+        tree.outgoing = outgoing.map(rel => ({
+          table: rel.table,
+          relations: this.buildRelationshipTree(rel.table, depth - 1, visited, analysisType)
+        }));
+      }
+
+      if (analysisType === 'incoming' || analysisType === 'both') {
+        tree.incoming = incoming.map(rel => ({
+          table: rel.source_table,
+          relations: this.buildRelationshipTree(rel.source_table, depth - 1, visited, analysisType)
+        }));
+      }
+    } catch (error) {
+      this.logger.debug('Error building relationship tree', { table: tableName, error });
+    }
+
+    return tree;
+  }
+
+  /**
    * Close all database connections
    */
   public close(): void {

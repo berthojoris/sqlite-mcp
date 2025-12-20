@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.8] - 2025-12-20
+
+### Added
+- **New Tool: `sqlite_relations`**: Comprehensive table relationship analysis tool for analyzing foreign key constraints and dependencies
+  - Supports incoming and outgoing relationship analysis
+  - Configurable depth traversal (1-5 levels) for deep relationship mapping
+  - Detailed cascade rule information (CASCADE, SET NULL, RESTRICT, NO ACTION)
+  - Related tables statistics and relationship tree building
+  - Enables understanding of data dependencies before deletion or schema changes
+- **Relationship Analysis Methods**: New DatabaseManager methods for analyzing table relationships
+  - `analyzeTableRelations()` - Main analysis method with filtering options
+  - `getOutgoingRelations()` - Foreign keys this table references
+  - `getIncomingRelations()` - Tables that reference this table with fallback support
+  - `buildRelationshipTree()` - Recursive traversal for deep analysis
+
+### Changed
+- Incremented tool count from 12 to 13 in README.md and documentation
+- Updated tool numbering in tools summary table
+
 ## [1.1.7] - 2025-12-20
 
 ### Fixed

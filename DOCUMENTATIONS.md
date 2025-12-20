@@ -10,6 +10,8 @@ Complete reference documentation for all 12 tools available in the SQLite MCP Se
   - [sqlite_query](#sqlite_query)
   - [sqlite_schema](#sqlite_schema)
   - [sqlite_tables](#sqlite_tables)
+- [Relationship Analysis](#relationship-analysis)
+  - [sqlite_relations](#sqlite_relations)
 - [CRUD Tools](#crud-tools)
   - [sqlite_insert](#sqlite_insert)
   - [sqlite_update](#sqlite_update)
@@ -130,6 +132,99 @@ List all tables in the database.
   ]
 }
 ```
+
+---
+
+## Relationship Analysis
+
+### sqlite_relations
+
+Analyze table relationships and foreign key constraints.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `table` | string | Yes | Table name to analyze relationships for |
+| `depth` | number | No | How deep to traverse relationships (1-5, default: 1) |
+| `analysisType` | string | No | Type of relationships: "incoming", "outgoing", or "both" (default: "both") |
+
+**Required Permission:** `list`
+
+**Example - Basic relationship analysis:**
+```json
+{
+  "table": "users"
+}
+```
+
+**Example - Deep traversal with specific direction:**
+```json
+{
+  "table": "orders",
+  "depth": 2,
+  "analysisType": "incoming"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "table": "users",
+  "outgoing": [
+    {
+      "local_column": "department_id",
+      "referenced_table": "departments",
+      "referenced_column": "id",
+      "cascade_delete": true,
+      "cascade_update": true,
+      "on_delete": "CASCADE",
+      "on_update": "CASCADE"
+    }
+  ],
+  "incoming": [
+    {
+      "source_table": "posts",
+      "source_column": "user_id",
+      "local_column": "id",
+      "referenced_table": "users",
+      "on_delete": "NO ACTION",
+      "on_update": "NO ACTION"
+    },
+    {
+      "source_table": "comments",
+      "source_column": "user_id",
+      "local_column": "id",
+      "referenced_table": "users",
+      "on_delete": "CASCADE",
+      "on_update": "CASCADE"
+    }
+  ],
+  "relatedTables": ["departments", "posts", "comments"],
+  "stats": {
+    "totalOutgoing": 1,
+    "totalIncoming": 2,
+    "totalRelatedTables": 3
+  },
+  "relationshipTree": null
+}
+```
+
+**Analysis Types Explained:**
+- **incoming**: Shows all tables that have foreign keys referencing this table (tables that depend on this table)
+- **outgoing**: Shows all tables that this table references with foreign keys (tables this table depends on)
+- **both**: Shows complete relationship picture in both directions
+
+**Cascade Rules:**
+- `cascade_delete: true` - Deleting a parent record automatically deletes related child records
+- `cascade_update: true` - Updating a parent key automatically updates related foreign keys
+- `on_delete/on_update` values: `CASCADE`, `SET NULL`, `RESTRICT`, `NO ACTION`
+
+**Use Cases:**
+- Understanding data dependencies before deletion
+- Finding all tables affected by schema changes
+- Identifying potential circular dependencies
+- Planning data migration or cleanup operations
+- Documenting database structure
 
 ---
 

@@ -42,7 +42,7 @@ export class MCPSQLiteServer {
     this.server = new Server(
       {
         name: 'sqlite-mcp-server',
-        version: '1.1.7',
+        version: '1.1.8',
         description: 'SQLite database server implementing the Model Context Protocol'
       },
       {
@@ -430,6 +430,30 @@ export class MCPSQLiteServer {
           required: ['operation', 'table']
         },
         requiredPermissions: ['ddl']
+      },
+      {
+        name: 'sqlite_relations',
+        description: 'Analyze table relationships and foreign key constraints. Shows incoming and outgoing foreign key relationships with cascade rules. Supports deep traversal to find all connected tables. Use this to understand table dependencies and relational structure.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            table: {
+              type: 'string',
+              description: 'Table name to analyze relationships for. Example: "users"'
+            },
+            depth: {
+              type: 'number',
+              description: 'How deep to traverse relationships (1-5). Default: 1 for immediate relations, higher values show cascading relationships'
+            },
+            analysisType: {
+              type: 'string',
+              enum: ['incoming', 'outgoing', 'both'],
+              description: 'Type of relationships to analyze: "incoming" (tables that reference this table), "outgoing" (tables this table references), or "both" (default: both)'
+            }
+          },
+          required: ['table']
+        },
+        requiredPermissions: ['list']
       }
     ];
 
@@ -498,6 +522,9 @@ export class MCPSQLiteServer {
       
       case 'sqlite_ddl':
         return this.handleDDL(args, clientId, clientPermissions);
+      
+      case 'sqlite_relations':
+        return this.handleRelations(args, clientId, clientPermissions);
       
       default:
         throw new Error(`Unknown tool: ${toolName}`);
@@ -1170,6 +1197,48 @@ export class MCPSQLiteServer {
 
       default:
         throw new Error(`Unknown alter action: ${alterAction.action}`);
+    }
+  }
+
+  /**
+   * Handle table relationship analysis
+   */
+  private async handleRelations(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { table, depth = 1, analysisType = 'both' } = args;
+
+    if (!permissions.includes('list')) {
+      throw new Error('Insufficient permissions for relationship analysis');
+    }
+
+    if (!table) {
+      throw new Error('Table name is required for relationship analysis');
+    }
+
+    // Validate depth
+    const validatedDepth = Math.min(Math.max(1, depth), 5);
+
+    // Validate analysisType
+    if (!['incoming', 'outgoing', 'both'].includes(analysisType)) {
+      throw new Error('analysisType must be one of: incoming, outgoing, both');
+    }
+
+    try {
+      const result = this.databaseManager.analyzeTableRelations(table, validatedDepth, analysisType);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          } as TextContent
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Relationship analysis failed: ${(error as Error).message}`);
     }
   }
 

@@ -15,7 +15,7 @@ A comprehensive Model Context Protocol (MCP) server implementation for SQLite da
   - [Cursor IDE](#cursor-ide)
   - [Continue.dev](#continuedev)
   - [Other MCP Clients](#other-mcp-clients)
-- [Available Tools (12 Tools)](#-available-tools)
+- [Available Tools (13 Tools)](#-available-tools)
 - [Tool Documentation](DOCUMENTATIONS.md)
 - [Permission System](#permission-system)
 - [Configuration](#-configuration)
@@ -451,7 +451,7 @@ mcp-sqlite-server config --template --output mcp-template.json
 
 ## 🔌 Available Tools
 
-The MCP server provides **12 powerful tools** for comprehensive SQLite database management:
+The MCP server provides **13 powerful tools** for comprehensive SQLite database management:
 
 ### Tools Summary
 
@@ -463,12 +463,13 @@ The MCP server provides **12 powerful tools** for comprehensive SQLite database 
 | 4 | [`sqlite_delete`](#sqlite_delete) | Delete records from tables | `delete` |
 | 5 | [`sqlite_schema`](#sqlite_schema) | Get comprehensive schema information | `list` |
 | 6 | [`sqlite_tables`](#sqlite_tables) | List all tables in database | `list` |
-| 7 | [`sqlite_transaction`](#sqlite_transaction) | Execute multiple queries atomically | `transaction` |
-| 8 | [`sqlite_backup`](#sqlite_backup) | Create database backup | `utility` |
-| 9 | [`sqlite_bulk_insert`](#sqlite_bulk_insert) | Bulk insert with relational support | `create` |
-| 10 | [`sqlite_bulk_update`](#sqlite_bulk_update) | Bulk update with progress tracking | `update` |
-| 11 | [`sqlite_bulk_delete`](#sqlite_bulk_delete) | Bulk delete with cascade support | `delete` |
-| 12 | [`sqlite_ddl`](#sqlite_ddl) | Schema management (CREATE/ALTER/DROP) | `ddl` |
+| 7 | [`sqlite_relations`](#sqlite_relations) | Analyze table relationships and foreign keys | `list` |
+| 8 | [`sqlite_transaction`](#sqlite_transaction) | Execute multiple queries atomically | `transaction` |
+| 9 | [`sqlite_backup`](#sqlite_backup) | Create database backup | `utility` |
+| 10 | [`sqlite_bulk_insert`](#sqlite_bulk_insert) | Bulk insert with relational support | `create` |
+| 11 | [`sqlite_bulk_update`](#sqlite_bulk_update) | Bulk update with progress tracking | `update` |
+| 12 | [`sqlite_bulk_delete`](#sqlite_bulk_delete) | Bulk delete with cascade support | `delete` |
+| 13 | [`sqlite_ddl`](#sqlite_ddl) | Schema management (CREATE/ALTER/DROP) | `ddl` |
 
 ### Tool Categories
 
@@ -476,6 +477,7 @@ The MCP server provides **12 powerful tools** for comprehensive SQLite database 
 - `sqlite_query` - Run SELECT statements
 - `sqlite_schema` - Inspect database structure
 - `sqlite_tables` - List available tables
+- `sqlite_relations` - Analyze table relationships and foreign keys
 
 **Data Manipulation (CRUD):**
 - `sqlite_insert` - Create new records
@@ -545,4 +547,4 @@ For issues, questions, or contributions:
 
 ---
 
-**Last Updated**: 2025-12-20 17:30:00
+**Last Updated**: 2025-12-20 18:45:00
