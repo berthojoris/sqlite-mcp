@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.4] - 2025-12-20
+
+### Changed
+- Removed Roadmap section from README.md
+- Removed Version History section from README.md
+- Updated Table of Contents to reflect removed sections
+
 ## [1.1.3] - 2024-12-20
 
 ### Added

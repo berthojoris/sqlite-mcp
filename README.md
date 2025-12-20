@@ -21,9 +21,7 @@ A comprehensive Model Context Protocol (MCP) server implementation for SQLite da
 - [Configuration](#-configuration)
 - [CLI Usage](#️-cli-usage)
 - [Security Guidelines](#-security-guidelines)
-- [Roadmap](#️-roadmap)
 - [Contributing](#-contributing)
-- [Version History](#-version-history)
 
 ## ⚡ Quick Start
 
@@ -524,54 +522,6 @@ The server automatically blocks or restricts:
 - Excessive query complexity
 - Operations without proper permissions
 
-## 🗺️ Roadmap
-
-### ✅ Version 1.0.0 - Core Foundation (Completed)
-- ✅ **MCP Protocol Implementation**: Full Model Context Protocol compliance
-- ✅ **SQLite Integration**: Native SQLite support with better-sqlite3
-- ✅ **Permission System**: Granular 9-tier permission system
-- ✅ **Security Features**: SQL injection protection and query validation
-- ✅ **CLI Interface**: Command-line interface with comprehensive options
-- ✅ **Connection Pooling**: Efficient database connection management
-- ✅ **Audit Logging**: Detailed operation logging for compliance
-- ✅ **Bulk Operations**: Enhanced bulk insert/update/delete with progress tracking
-
-### ✅ Version 1.0.1 - Auto-Creation & Documentation (Completed)
-- ✅ **Database Auto-Creation**: Automatic database file creation
-- ✅ **Directory Auto-Creation**: Recursive parent directory creation
-- ✅ **Enhanced Logging**: Improved initialization and status logging
-- ✅ **Roadmap Documentation**: Comprehensive development roadmap
-- ✅ **Cross-Platform Path Handling**: Windows and Unix path resolution
-
-### 🚧 Version 1.1.0 - Enhanced Query & Performance (Q1 2025)
-- [ ] **Advanced Query Builder**: Visual query builder with drag-and-drop interface
-- [ ] **Query Optimization**: Automatic query analysis and optimization suggestions
-- [ ] **Performance Metrics**: Real-time query performance monitoring and analytics
-- [ ] **Connection Health Monitoring**: Advanced connection pool health checks
-- [ ] **Memory Usage Optimization**: Improved memory management for large datasets
-
-### 📋 Version 1.2.0 - Data Management & Migration (Q2 2025)
-- [ ] **Database Migration Tools**: Schema versioning and migration management
-- [ ] **Data Import/Export**: Support for CSV, JSON, XML data import/export
-- [ ] **Data Validation**: Custom validation rules and constraints
-- [ ] **Backup Scheduling**: Automated backup scheduling with retention policies
-
-### 🔒 Version 1.3.0 - Advanced Security & Compliance (Q2 2025)
-- [ ] **Role-Based Access Control (RBAC)**: Advanced user roles and permissions
-- [ ] **Data Encryption**: At-rest and in-transit data encryption
-- [ ] **Compliance Reporting**: GDPR, HIPAA, SOX compliance reporting tools
-- [ ] **Advanced Audit Logging**: Enhanced audit trails with data lineage tracking
-- [ ] **Security Scanning**: Automated security vulnerability scanning
-
-### 🔌 Version 1.4.0 - Integration & Extensibility (Q3 2025)
-- [ ] **Plugin System**: Extensible plugin architecture for custom functionality
-- [ ] **REST API Gateway**: RESTful API layer for non-MCP clients
-- [ ] **GraphQL Support**: GraphQL query interface for flexible data access
-- [ ] **Webhook Integration**: Event-driven webhooks for database changes
-- [ ] **Third-party Integrations**: Slack, Discord, Teams notifications
-
-
-
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -591,44 +541,8 @@ For issues, questions, or contributions:
 - GitHub Issues: [Repository Issues](https://github.com/berthojoris/mcp-sqlite-server/issues)
 - Documentation: [Full Documentation](https://github.com/berthojoris/mcp-sqlite-server/wiki)
 
-## 🔄 Version History
-
-### v1.1.3
-- **Comprehensive Integration Guide**: Setup instructions for Claude Desktop, Cursor, Continue.dev, Cline, Windsurf
-- **Tools Summary Table**: Quick reference table listing all 12 tools
-- **Table of Contents & Quick Start**: Improved documentation navigation and onboarding
-- **Multiple Database Configuration**: Examples for multi-database setups
-
-### v1.1.2
-- **DDL Tool**: New dedicated `sqlite_ddl` tool for schema management (CREATE/ALTER/DROP tables, indexes)
-- **Procedure Permission**: Added `procedure` permission type for future compatibility
-- **Enhanced Documentation**: Improved ENHANCEMENTS.md with proper formatting and status tracking
-
-### v1.1.1
-- **Bulk Operations**: Advanced bulk insert, update, and delete operations with progress tracking
-- **Relational Data Support**: Bulk insert with foreign key mappings and related table data
-- **Progress Tracking**: Real-time progress monitoring for bulk operations with error handling
-- **Performance Optimization**: Batch processing with configurable batch sizes for large datasets
-- **Enhanced Error Handling**: Improved error reporting and continue-on-error options for bulk operations
-
-### v1.0.1
-- **Auto-Creation Features**: Database and directory auto-creation functionality
-- **Enhanced Logging**: Improved initialization logging with database status
-- **Roadmap Documentation**: Comprehensive roadmap for future development
-- **Bug Fixes**: Minor improvements and stability enhancements
-
-### v1.0.0
-- Initial release
-- Full MCP protocol implementation
-- Comprehensive permission system
-- Security features and audit logging
-- CLI interface and schema introspection
-- Connection pooling and performance optimization
-
----
-
 **Note**: This server is designed for secure, controlled access to SQLite databases through the Model Context Protocol. Always follow security best practices and regularly review audit logs in production environments.
 
 ---
 
-**Last Updated**: 2024-12-20 17:30:00
+**Last Updated**: 2025-12-20 12:00:00
