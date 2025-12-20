@@ -39,5 +39,4 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-.trae/documents/SQLite_MCP_Server_PRD.md
-.trae/documents/SQLite_MCP_Server_Technical_Architecture.md
+/.trae/

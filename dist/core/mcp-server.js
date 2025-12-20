@@ -321,6 +321,82 @@ class MCPSQLiteServer {
                     required: ['table', 'conditions']
                 },
                 requiredPermissions: ['delete']
+            },
+            {
+                name: 'sqlite_ddl',
+                description: 'Execute DDL (Data Definition Language) operations for schema management',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        operation: {
+                            type: 'string',
+                            enum: ['create_table', 'drop_table', 'alter_table', 'create_index', 'drop_index'],
+                            description: 'DDL operation to perform'
+                        },
+                        table: {
+                            type: 'string',
+                            description: 'Table name'
+                        },
+                        columns: {
+                            type: 'array',
+                            description: 'Column definitions for create_table',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    name: { type: 'string', description: 'Column name' },
+                                    type: { type: 'string', description: 'Column data type (TEXT, INTEGER, REAL, BLOB, etc.)' },
+                                    primaryKey: { type: 'boolean', description: 'Is primary key' },
+                                    autoIncrement: { type: 'boolean', description: 'Auto increment (only for INTEGER PRIMARY KEY)' },
+                                    notNull: { type: 'boolean', description: 'NOT NULL constraint' },
+                                    unique: { type: 'boolean', description: 'UNIQUE constraint' },
+                                    defaultValue: { type: 'string', description: 'Default value' },
+                                    foreignKey: {
+                                        type: 'object',
+                                        description: 'Foreign key reference',
+                                        properties: {
+                                            table: { type: 'string' },
+                                            column: { type: 'string' },
+                                            onDelete: { type: 'string', enum: ['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION'] },
+                                            onUpdate: { type: 'string', enum: ['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION'] }
+                                        }
+                                    }
+                                },
+                                required: ['name', 'type']
+                            }
+                        },
+                        alterAction: {
+                            type: 'object',
+                            description: 'Alter table action',
+                            properties: {
+                                action: { type: 'string', enum: ['add_column', 'rename_table', 'rename_column'] },
+                                column: { type: 'object', description: 'Column definition for add_column' },
+                                newName: { type: 'string', description: 'New name for rename operations' },
+                                oldColumnName: { type: 'string', description: 'Old column name for rename_column' }
+                            }
+                        },
+                        index: {
+                            type: 'object',
+                            description: 'Index definition',
+                            properties: {
+                                name: { type: 'string', description: 'Index name' },
+                                columns: { type: 'array', items: { type: 'string' }, description: 'Columns to index' },
+                                unique: { type: 'boolean', description: 'Create unique index' }
+                            }
+                        },
+                        ifNotExists: {
+                            type: 'boolean',
+                            description: 'Add IF NOT EXISTS clause',
+                            default: false
+                        },
+                        ifExists: {
+                            type: 'boolean',
+                            description: 'Add IF EXISTS clause for drop operations',
+                            default: false
+                        }
+                    },
+                    required: ['operation', 'table']
+                },
+                requiredPermissions: ['ddl']
             }
         ];
         // Convert to MCP Tool format
@@ -359,6 +435,8 @@ class MCPSQLiteServer {
                 return this.handleBulkUpdate(args, clientId, clientPermissions);
             case 'sqlite_bulk_delete':
                 return this.handleBulkDelete(args, clientId, clientPermissions);
+            case 'sqlite_ddl':
+                return this.handleDDL(args, clientId, clientPermissions);
             default:
                 throw new Error(`Unknown tool: ${toolName}`);
         }
@@ -728,6 +806,140 @@ class MCPSQLiteServer {
         }
         catch (error) {
             throw new Error(`Bulk delete failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Handle DDL (Data Definition Language) operations
+     */
+    async handleDDL(args, clientId, permissions) {
+        const { operation, table, columns, alterAction, index, ifNotExists, ifExists } = args;
+        if (!permissions.includes('ddl')) {
+            throw new Error('Insufficient permissions for DDL operation');
+        }
+        let query = '';
+        switch (operation) {
+            case 'create_table':
+                if (!columns || columns.length === 0) {
+                    throw new Error('Columns are required for create_table operation');
+                }
+                query = this.buildCreateTableQuery(table, columns, ifNotExists);
+                break;
+            case 'drop_table':
+                query = `DROP TABLE ${ifExists ? 'IF EXISTS ' : ''}${table}`;
+                break;
+            case 'alter_table':
+                if (!alterAction) {
+                    throw new Error('alterAction is required for alter_table operation');
+                }
+                query = this.buildAlterTableQuery(table, alterAction);
+                break;
+            case 'create_index':
+                if (!index || !index.name || !index.columns) {
+                    throw new Error('Index name and columns are required for create_index operation');
+                }
+                query = `CREATE ${index.unique ? 'UNIQUE ' : ''}INDEX ${ifNotExists ? 'IF NOT EXISTS ' : ''}${index.name} ON ${table} (${index.columns.join(', ')})`;
+                break;
+            case 'drop_index':
+                if (!index || !index.name) {
+                    throw new Error('Index name is required for drop_index operation');
+                }
+                query = `DROP INDEX ${ifExists ? 'IF EXISTS ' : ''}${index.name}`;
+                break;
+            default:
+                throw new Error(`Unknown DDL operation: ${operation}`);
+        }
+        // Validate query
+        const validation = await this.securityManager.validateQuery(query, [], permissions, clientId);
+        if (!validation.isValid) {
+            throw new Error(`DDL validation failed: ${validation.reason}`);
+        }
+        // Execute DDL
+        const result = this.databaseManager.executeQuery(query, [], clientId);
+        if (!result.success) {
+            throw new Error(result.error || 'DDL operation failed');
+        }
+        return {
+            content: [
+                {
+                    type: 'text',
+                    text: JSON.stringify({
+                        success: true,
+                        operation,
+                        table,
+                        query,
+                        executionTime: result.executionTime
+                    }, null, 2)
+                }
+            ]
+        };
+    }
+    /**
+     * Build CREATE TABLE query from column definitions
+     */
+    buildCreateTableQuery(table, columns, ifNotExists = false) {
+        const columnDefs = [];
+        const foreignKeys = [];
+        for (const col of columns) {
+            let colDef = `${col.name} ${col.type}`;
+            if (col.primaryKey) {
+                colDef += ' PRIMARY KEY';
+                if (col.autoIncrement && col.type.toUpperCase() === 'INTEGER') {
+                    colDef += ' AUTOINCREMENT';
+                }
+            }
+            if (col.notNull) {
+                colDef += ' NOT NULL';
+            }
+            if (col.unique && !col.primaryKey) {
+                colDef += ' UNIQUE';
+            }
+            if (col.defaultValue !== undefined) {
+                colDef += ` DEFAULT ${col.defaultValue}`;
+            }
+            columnDefs.push(colDef);
+            if (col.foreignKey) {
+                const fk = col.foreignKey;
+                let fkDef = `FOREIGN KEY (${col.name}) REFERENCES ${fk.table}(${fk.column})`;
+                if (fk.onDelete) {
+                    fkDef += ` ON DELETE ${fk.onDelete}`;
+                }
+                if (fk.onUpdate) {
+                    fkDef += ` ON UPDATE ${fk.onUpdate}`;
+                }
+                foreignKeys.push(fkDef);
+            }
+        }
+        const allDefs = [...columnDefs, ...foreignKeys];
+        return `CREATE TABLE ${ifNotExists ? 'IF NOT EXISTS ' : ''}${table} (${allDefs.join(', ')})`;
+    }
+    /**
+     * Build ALTER TABLE query from action
+     */
+    buildAlterTableQuery(table, alterAction) {
+        switch (alterAction.action) {
+            case 'add_column':
+                if (!alterAction.column) {
+                    throw new Error('Column definition is required for add_column action');
+                }
+                const col = alterAction.column;
+                let colDef = `${col.name} ${col.type}`;
+                if (col.notNull)
+                    colDef += ' NOT NULL';
+                if (col.defaultValue !== undefined)
+                    colDef += ` DEFAULT ${col.defaultValue}`;
+                return `ALTER TABLE ${table} ADD COLUMN ${colDef}`;
+            case 'rename_table':
+                if (!alterAction.newName) {
+                    throw new Error('newName is required for rename_table action');
+                }
+                return `ALTER TABLE ${table} RENAME TO ${alterAction.newName}`;
+            case 'rename_column':
+                if (!alterAction.oldColumnName || !alterAction.newName) {
+                    throw new Error('oldColumnName and newName are required for rename_column action');
+                }
+                return `ALTER TABLE ${table} RENAME COLUMN ${alterAction.oldColumnName} TO ${alterAction.newName}`;
+            default:
+                throw new Error(`Unknown alter action: ${alterAction.action}`);
         }
     }
     /**

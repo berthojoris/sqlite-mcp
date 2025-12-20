@@ -1,7 +1,7 @@
 /**
  * Type definitions for SQLite MCP Server
  */
-export type PermissionType = 'list' | 'read' | 'create' | 'update' | 'delete' | 'execute' | 'ddl' | 'transaction' | 'utility';
+export type PermissionType = 'list' | 'read' | 'create' | 'update' | 'delete' | 'execute' | 'ddl' | 'procedure' | 'transaction' | 'utility';
 export interface DatabaseConfig {
     path: string;
     maxConnections?: number;

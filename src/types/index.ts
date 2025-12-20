@@ -3,15 +3,16 @@
  */
 
 export type PermissionType = 
-  | 'list'      // List tables and schemas
-  | 'read'      // SELECT queries
-  | 'create'    // INSERT queries
-  | 'update'    // UPDATE queries
-  | 'delete'    // DELETE queries
-  | 'execute'   // Execute stored procedures/functions
-  | 'ddl'       // Data Definition Language (CREATE, ALTER, DROP)
+  | 'list'        // List tables and schemas
+  | 'read'        // SELECT queries
+  | 'create'      // INSERT queries
+  | 'update'      // UPDATE queries
+  | 'delete'      // DELETE queries
+  | 'execute'     // Execute stored procedures/functions
+  | 'ddl'         // Data Definition Language (CREATE, ALTER, DROP)
+  | 'procedure'   // Stored procedures (N/A for SQLite - reserved for compatibility)
   | 'transaction' // Transaction control (BEGIN, COMMIT, ROLLBACK)
-  | 'utility';   // Utility operations (VACUUM, ANALYZE, etc.)
+  | 'utility';    // Utility operations (VACUUM, ANALYZE, etc.)
 
 export interface DatabaseConfig {
   path: string;

@@ -2,12 +2,56 @@
 
 A comprehensive Model Context Protocol (MCP) server implementation for SQLite databases, providing secure and controlled access to SQLite operations through a standardized interface.
 
+[![npm version](https://badge.fury.io/js/%40berthojoris%2Fmcp-sqlite-server.svg)](https://www.npmjs.com/package/@berthojoris/mcp-sqlite-server)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+## 📋 Table of Contents
+
+- [Features](#-features)
+- [Quick Start](#-quick-start)
+- [Installation](#-installation)
+- [Integration Guide](#-integration-guide)
+  - [Claude Desktop](#claude-desktop)
+  - [Cursor IDE](#cursor-ide)
+  - [Continue.dev](#continuedev)
+  - [Other MCP Clients](#other-mcp-clients)
+- [Available Tools (12 Tools)](#-available-tools)
+- [Permission System](#permission-system)
+- [Configuration](#-configuration)
+- [CLI Usage](#️-cli-usage)
+- [Security Guidelines](#-security-guidelines)
+- [Roadmap](#️-roadmap)
+- [Contributing](#-contributing)
+- [Version History](#-version-history)
+
+## ⚡ Quick Start
+
+Get up and running in 30 seconds:
+
+```bash
+# Run directly with npx (no installation required)
+npx @berthojoris/mcp-sqlite-server sqlite:////path/to/database.sqlite list,read,create,update,delete
+```
+
+Or add to your MCP client configuration:
+
+```json
+{
+  "mcpServers": {
+    "sqlite": {
+      "command": "npx",
+      "args": ["-y", "@berthojoris/mcp-sqlite-server", "sqlite:////path/to/db.sqlite", "list,read,create,update,delete"]
+    }
+  }
+}
+```
+
 ## 🚀 Features
 
 ### Core Functionality
 - **MCP Protocol Compliance**: Full implementation of the Model Context Protocol for seamless integration with MCP clients
 - **SQLite Integration**: Native SQLite support using `better-sqlite3` for optimal performance
-- **Granular Permissions**: Fine-grained permission system with 9 distinct permission types
+- **Granular Permissions**: Fine-grained permission system with 10 distinct permission types
 - **Security First**: Comprehensive SQL injection protection and query validation
 - **Schema Introspection**: Complete database schema analysis and reporting
 - **Connection Pooling**: Efficient database connection management
@@ -23,6 +67,7 @@ The server implements a granular permission system with the following types:
 - `delete` - DELETE operations
 - `execute` - Execute stored procedures/functions
 - `ddl` - Data Definition Language (CREATE, ALTER, DROP)
+- `procedure` - Stored procedures (N/A for SQLite - reserved for compatibility)
 - `transaction` - Transaction control (BEGIN, COMMIT, ROLLBACK)
 - `utility` - Utility operations (VACUUM, ANALYZE, PRAGMA, etc.)
 
@@ -56,6 +101,225 @@ mcp-sqlite-server sqlite:////path/to/your/database.sqlite list,read,create,updat
 ### Local Installation
 ```bash
 npm install @berthojoris/mcp-sqlite-server
+```
+
+## 🔗 Integration Guide
+
+This section provides detailed instructions for integrating SQLite MCP Server with various MCP-compatible clients.
+
+### Claude Desktop
+
+Claude Desktop is the official Anthropic client with native MCP support.
+
+**Configuration File Location:**
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+
+**Configuration:**
+```json
+{
+  "mcpServers": {
+    "sqlite": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@berthojoris/mcp-sqlite-server",
+        "sqlite:////Users/yourname/databases/myapp.sqlite",
+        "list,read,create,update,delete,utility"
+      ]
+    }
+  }
+}
+```
+
+**Windows Example:**
+```json
+{
+  "mcpServers": {
+    "sqlite": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@berthojoris/mcp-sqlite-server",
+        "sqlite:///C:/Users/yourname/databases/myapp.sqlite",
+        "list,read,create,update,delete,utility"
+      ]
+    }
+  }
+}
+```
+
+**After configuration:** Restart Claude Desktop to load the MCP server.
+
+---
+
+### Cursor IDE
+
+Cursor IDE supports MCP servers for enhanced AI-assisted development.
+
+**Configuration File Location:**
+- **macOS/Linux**: `~/.cursor/mcp.json`
+- **Windows**: `%USERPROFILE%\.cursor\mcp.json`
+
+**Configuration:**
+```json
+{
+  "mcpServers": {
+    "sqlite": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@berthojoris/mcp-sqlite-server",
+        "sqlite:////path/to/your/project/database.sqlite",
+        "list,read,create,update,delete,ddl,transaction,utility"
+      ]
+    }
+  }
+}
+```
+
+**Project-Specific Configuration (`.cursor/mcp.json` in project root):**
+```json
+{
+  "mcpServers": {
+    "project-db": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@berthojoris/mcp-sqlite-server",
+        "sqlite://./data/app.sqlite",
+        "list,read,create,update,delete"
+      ]
+    }
+  }
+}
+```
+
+---
+
+### Continue.dev
+
+Continue.dev is an open-source AI code assistant that supports MCP.
+
+**Configuration File:** `~/.continue/config.json`
+
+```json
+{
+  "mcpServers": [
+    {
+      "name": "sqlite",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@berthojoris/mcp-sqlite-server",
+        "sqlite:////path/to/database.sqlite",
+        "list,read,create,update,delete"
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### Cline (VS Code Extension)
+
+Cline is a VS Code extension that supports MCP servers.
+
+**Configuration:** Add to VS Code settings (`settings.json`):
+
+```json
+{
+  "cline.mcpServers": {
+    "sqlite": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@berthojoris/mcp-sqlite-server",
+        "sqlite:////path/to/database.sqlite",
+        "list,read,create,update,delete,utility"
+      ]
+    }
+  }
+}
+```
+
+---
+
+### Windsurf IDE
+
+Windsurf IDE by Codeium supports MCP integration.
+
+**Configuration File:** `~/.windsurf/mcp.json`
+
+```json
+{
+  "mcpServers": {
+    "sqlite": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@berthojoris/mcp-sqlite-server",
+        "sqlite:////path/to/database.sqlite",
+        "list,read,create,update,delete,ddl"
+      ]
+    }
+  }
+}
+```
+
+---
+
+### Other MCP Clients
+
+For any MCP-compatible client, use the following general configuration pattern:
+
+```json
+{
+  "mcpServers": {
+    "sqlite": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@berthojoris/mcp-sqlite-server",
+        "<connection-string>",
+        "<permissions>"
+      ]
+    }
+  }
+}
+```
+
+**Arguments:**
+1. `-y` - Auto-confirm npx installation
+2. `@berthojoris/mcp-sqlite-server` - Package name
+3. `<connection-string>` - SQLite database path (see Connection String Formats below)
+4. `<permissions>` - Comma-separated list of permissions
+
+---
+
+### Multiple Database Configuration
+
+You can configure multiple SQLite databases:
+
+```json
+{
+  "mcpServers": {
+    "main-db": {
+      "command": "npx",
+      "args": ["-y", "@berthojoris/mcp-sqlite-server", "sqlite:////path/to/main.sqlite", "list,read,create,update,delete"]
+    },
+    "analytics-db": {
+      "command": "npx",
+      "args": ["-y", "@berthojoris/mcp-sqlite-server", "sqlite:////path/to/analytics.sqlite", "list,read"]
+    },
+    "logs-db": {
+      "command": "npx",
+      "args": ["-y", "@berthojoris/mcp-sqlite-server", "sqlite:////path/to/logs.sqlite", "list,read,utility"]
+    }
+  }
+}
 ```
 
 ## 🔧 Configuration
@@ -323,7 +587,52 @@ mcp-sqlite-server config --template --output mcp-template.json
 
 ## 🔌 Available Tools
 
-The MCP server provides the following tools:
+The MCP server provides **12 powerful tools** for comprehensive SQLite database management:
+
+### Tools Summary
+
+| # | Tool | Description | Permission |
+|---|------|-------------|------------|
+| 1 | [`sqlite_query`](#sqlite_query) | Execute SELECT queries with parameterized support | `read` |
+| 2 | [`sqlite_insert`](#sqlite_insert) | Insert single records into tables | `create` |
+| 3 | [`sqlite_update`](#sqlite_update) | Update existing records | `update` |
+| 4 | [`sqlite_delete`](#sqlite_delete) | Delete records from tables | `delete` |
+| 5 | [`sqlite_schema`](#sqlite_schema) | Get comprehensive schema information | `list` |
+| 6 | [`sqlite_tables`](#sqlite_tables) | List all tables in database | `list` |
+| 7 | [`sqlite_transaction`](#sqlite_transaction) | Execute multiple queries atomically | `transaction` |
+| 8 | [`sqlite_backup`](#sqlite_backup) | Create database backup | `utility` |
+| 9 | [`sqlite_bulk_insert`](#sqlite_bulk_insert) | Bulk insert with relational support | `create` |
+| 10 | [`sqlite_bulk_update`](#sqlite_bulk_update) | Bulk update with progress tracking | `update` |
+| 11 | [`sqlite_bulk_delete`](#sqlite_bulk_delete) | Bulk delete with cascade support | `delete` |
+| 12 | [`sqlite_ddl`](#sqlite_ddl) | Schema management (CREATE/ALTER/DROP) | `ddl` |
+
+### Tool Categories
+
+**Data Query & Retrieval:**
+- `sqlite_query` - Run SELECT statements
+- `sqlite_schema` - Inspect database structure
+- `sqlite_tables` - List available tables
+
+**Data Manipulation (CRUD):**
+- `sqlite_insert` - Create new records
+- `sqlite_update` - Modify existing records
+- `sqlite_delete` - Remove records
+
+**Bulk Operations:**
+- `sqlite_bulk_insert` - Insert many records efficiently
+- `sqlite_bulk_update` - Update many records at once
+- `sqlite_bulk_delete` - Delete many records with cascade support
+
+**Schema Management:**
+- `sqlite_ddl` - CREATE/ALTER/DROP tables and indexes
+
+**Database Operations:**
+- `sqlite_transaction` - Atomic multi-query execution
+- `sqlite_backup` - Database backup utility
+
+---
+
+### Detailed Tool Documentation
 
 ### `sqlite_query`
 Execute SELECT queries with full result sets.
@@ -534,6 +843,69 @@ Perform bulk delete operations with cascading support and progress tracking.
 }
 ```
 
+### `sqlite_ddl`
+Execute DDL (Data Definition Language) operations for schema management.
+
+**Parameters:**
+- `operation` (string): DDL operation - `create_table`, `drop_table`, `alter_table`, `create_index`, `drop_index`
+- `table` (string): Table name
+- `columns` (array, optional): Column definitions for `create_table`
+  - `name` (string): Column name
+  - `type` (string): Data type (TEXT, INTEGER, REAL, BLOB, etc.)
+  - `primaryKey` (boolean): Is primary key
+  - `autoIncrement` (boolean): Auto increment (only for INTEGER PRIMARY KEY)
+  - `notNull` (boolean): NOT NULL constraint
+  - `unique` (boolean): UNIQUE constraint
+  - `defaultValue` (string): Default value
+  - `foreignKey` (object): Foreign key reference with `table`, `column`, `onDelete`, `onUpdate`
+- `alterAction` (object, optional): For `alter_table` - `action` (`add_column`, `rename_table`, `rename_column`), `column`, `newName`, `oldColumnName`
+- `index` (object, optional): For index operations - `name`, `columns`, `unique`
+- `ifNotExists` (boolean): Add IF NOT EXISTS clause
+- `ifExists` (boolean): Add IF EXISTS clause for drop operations
+
+**Required Permissions:** `ddl`
+
+**Example - Create Table:**
+```json
+{
+  "operation": "create_table",
+  "table": "users",
+  "columns": [
+    {"name": "id", "type": "INTEGER", "primaryKey": true, "autoIncrement": true},
+    {"name": "name", "type": "TEXT", "notNull": true},
+    {"name": "email", "type": "TEXT", "unique": true},
+    {"name": "created_at", "type": "TEXT", "defaultValue": "CURRENT_TIMESTAMP"}
+  ],
+  "ifNotExists": true
+}
+```
+
+**Example - Create Index:**
+```json
+{
+  "operation": "create_index",
+  "table": "users",
+  "index": {
+    "name": "idx_users_email",
+    "columns": ["email"],
+    "unique": true
+  },
+  "ifNotExists": true
+}
+```
+
+**Example - Alter Table:**
+```json
+{
+  "operation": "alter_table",
+  "table": "users",
+  "alterAction": {
+    "action": "add_column",
+    "column": {"name": "phone", "type": "TEXT"}
+  }
+}
+```
+
 ## 🔒 Security Guidelines
 
 ### Best Practices
@@ -629,6 +1001,17 @@ For issues, questions, or contributions:
 
 ## 🔄 Version History
 
+### v1.1.3
+- **Comprehensive Integration Guide**: Setup instructions for Claude Desktop, Cursor, Continue.dev, Cline, Windsurf
+- **Tools Summary Table**: Quick reference table listing all 12 tools
+- **Table of Contents & Quick Start**: Improved documentation navigation and onboarding
+- **Multiple Database Configuration**: Examples for multi-database setups
+
+### v1.1.2
+- **DDL Tool**: New dedicated `sqlite_ddl` tool for schema management (CREATE/ALTER/DROP tables, indexes)
+- **Procedure Permission**: Added `procedure` permission type for future compatibility
+- **Enhanced Documentation**: Improved ENHANCEMENTS.md with proper formatting and status tracking
+
 ### v1.1.1
 - **Bulk Operations**: Advanced bulk insert, update, and delete operations with progress tracking
 - **Relational Data Support**: Bulk insert with foreign key mappings and related table data
@@ -653,3 +1036,7 @@ For issues, questions, or contributions:
 ---
 
 **Note**: This server is designed for secure, controlled access to SQLite databases through the Model Context Protocol. Always follow security best practices and regularly review audit logs in production environments.
+
+---
+
+**Last Updated**: 2024-12-20 17:00:00

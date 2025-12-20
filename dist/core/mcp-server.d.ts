@@ -76,6 +76,18 @@ export declare class MCPSQLiteServer {
      */
     private handleBulkDelete;
     /**
+     * Handle DDL (Data Definition Language) operations
+     */
+    private handleDDL;
+    /**
+     * Build CREATE TABLE query from column definitions
+     */
+    private buildCreateTableQuery;
+    /**
+     * Build ALTER TABLE query from action
+     */
+    private buildAlterTableQuery;
+    /**
      * Set client permissions
      */
     setClientPermissions(clientId: string, permissions: PermissionType[]): void;
