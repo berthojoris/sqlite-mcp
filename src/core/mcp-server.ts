@@ -10,9 +10,7 @@ import {
   ListToolsRequestSchema,
   Tool,
   CallToolResult,
-  TextContent,
-  ImageContent,
-  EmbeddedResource
+  TextContent
 } from '@modelcontextprotocol/sdk/types.js';
 import { DatabaseManager } from '../database';
 import { SecurityManager } from '../security';
@@ -44,7 +42,7 @@ export class MCPSQLiteServer {
     this.server = new Server(
       {
         name: 'sqlite-mcp-server',
-        version: '1.1.6',
+        version: '1.1.7',
         description: 'SQLite database server implementing the Model Context Protocol'
       },
       {

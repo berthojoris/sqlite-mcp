@@ -22,6 +22,7 @@ import {
 import { Logger } from 'winston';
 import * as path from 'path';
 import * as fs from 'fs';
+import { safeIdentifier, isValidIdentifier } from '../utils';
 
 export class DatabaseManager {
   private static instances: Map<string, DatabaseManager> = new Map();
@@ -456,7 +457,11 @@ export class DatabaseManager {
    * Get column information for a table
    */
   private getTableColumns(tableName: string): ColumnInfo[] {
-    const columnsQuery = `PRAGMA table_info(${tableName})`;
+    // Validate table name to prevent SQL injection in PRAGMA
+    if (!isValidIdentifier(tableName)) {
+      throw new Error(`Invalid table name: ${tableName}`);
+    }
+    const columnsQuery = `PRAGMA table_info("${tableName}")`;
     const columns = this.db!.prepare(columnsQuery).all() as Array<{
       cid: number;
       name: string;
@@ -480,7 +485,11 @@ export class DatabaseManager {
    * Get primary key columns for a table
    */
   private getPrimaryKey(tableName: string): string[] {
-    const columnsQuery = `PRAGMA table_info(${tableName})`;
+    // Validate table name to prevent SQL injection in PRAGMA
+    if (!isValidIdentifier(tableName)) {
+      throw new Error(`Invalid table name: ${tableName}`);
+    }
+    const columnsQuery = `PRAGMA table_info("${tableName}")`;
     const columns = this.db!.prepare(columnsQuery).all() as Array<{
       name: string;
       pk: number;
@@ -496,7 +505,11 @@ export class DatabaseManager {
    * Get foreign key information for a table
    */
   private getForeignKeys(tableName: string): any[] {
-    const fkQuery = `PRAGMA foreign_key_list(${tableName})`;
+    // Validate table name to prevent SQL injection in PRAGMA
+    if (!isValidIdentifier(tableName)) {
+      throw new Error(`Invalid table name: ${tableName}`);
+    }
+    const fkQuery = `PRAGMA foreign_key_list("${tableName}")`;
     return this.db!.prepare(fkQuery).all();
   }
 
@@ -504,7 +517,11 @@ export class DatabaseManager {
    * Get indexes for a table
    */
   private getTableIndexes(tableName: string): string[] {
-    const indexQuery = `PRAGMA index_list(${tableName})`;
+    // Validate table name to prevent SQL injection in PRAGMA
+    if (!isValidIdentifier(tableName)) {
+      throw new Error(`Invalid table name: ${tableName}`);
+    }
+    const indexQuery = `PRAGMA index_list("${tableName}")`;
     const indexes = this.db!.prepare(indexQuery).all() as Array<{ name: string }>;
     return indexes.map(idx => idx.name);
   }
@@ -618,9 +635,11 @@ export class DatabaseManager {
             // Insert related records and track ID mappings
             for (const relatedRecord of tableData.records) {
               try {
+                const safeTableName = safeIdentifier(tableName, 'table name');
                 const columns = Object.keys(relatedRecord);
+                const safeColumns = columns.map(col => safeIdentifier(col, 'column name'));
                 const placeholders = columns.map(() => '?').join(', ');
-                const insertSql = `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
+                const insertSql = `INSERT INTO ${safeTableName} (${safeColumns.join(', ')}) VALUES (${placeholders})`;
                 const stmt = connection.prepare(insertSql);
                 const result = stmt.run(...Object.values(relatedRecord));
                 
@@ -667,9 +686,11 @@ export class DatabaseManager {
                 }
               }
               
+              const safeMainTable = safeIdentifier(data.mainTable, 'table name');
               const columns = Object.keys(record);
+              const safeColumns = columns.map(col => safeIdentifier(col, 'column name'));
               const placeholders = columns.map(() => '?').join(', ');
-              const insertSql = `INSERT INTO ${data.mainTable} (${columns.join(', ')}) VALUES (${placeholders})`;
+              const insertSql = `INSERT INTO ${safeMainTable} (${safeColumns.join(', ')}) VALUES (${placeholders})`;
               const stmt = connection.prepare(insertSql);
               stmt.run(...Object.values(record));
               
@@ -759,15 +780,16 @@ export class DatabaseManager {
             const recordIndex = i + j;
             
             try {
+              const safeTable = safeIdentifier(data.table, 'table name');
               const setClause = Object.keys(update.data)
-                .map(key => `${key} = ?`)
+                .map(key => `${safeIdentifier(key, 'column name')} = ?`)
                 .join(', ');
               
               const whereClause = Object.keys(update.where)
-                .map(key => `${key} = ?`)
+                .map(key => `${safeIdentifier(key, 'column name')} = ?`)
                 .join(' AND ');
               
-              const updateSql = `UPDATE ${data.table} SET ${setClause} WHERE ${whereClause}`;
+              const updateSql = `UPDATE ${safeTable} SET ${setClause} WHERE ${whereClause}`;
               const stmt = connection.prepare(updateSql);
               const result = stmt.run(...Object.values(update.data), ...Object.values(update.where));
               
@@ -885,22 +907,24 @@ export class DatabaseManager {
               // Handle cascade delete first
               if (cascadeDelete && foreignKeyTables.length > 0) {
                 for (const fkTable of foreignKeyTables) {
+                  const safeFkTable = safeIdentifier(fkTable, 'table name');
                   const whereClause = Object.keys(condition)
-                    .map(key => `${key} = ?`)
+                    .map(key => `${safeIdentifier(key, 'column name')} = ?`)
                     .join(' AND ');
                   
-                  const cascadeDeleteSql = `DELETE FROM ${fkTable} WHERE ${whereClause}`;
+                  const cascadeDeleteSql = `DELETE FROM ${safeFkTable} WHERE ${whereClause}`;
                   const cascadeStmt = connection.prepare(cascadeDeleteSql);
                   cascadeStmt.run(...Object.values(condition));
                 }
               }
               
               // Delete from main table
+              const safeTable = safeIdentifier(data.table, 'table name');
               const whereClause = Object.keys(condition)
-                .map(key => `${key} = ?`)
+                .map(key => `${safeIdentifier(key, 'column name')} = ?`)
                 .join(' AND ');
               
-              const deleteSql = `DELETE FROM ${data.table} WHERE ${whereClause}`;
+              const deleteSql = `DELETE FROM ${safeTable} WHERE ${whereClause}`;
               const stmt = connection.prepare(deleteSql);
               const result = stmt.run(...Object.values(condition));
               

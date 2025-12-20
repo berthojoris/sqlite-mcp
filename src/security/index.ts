@@ -13,14 +13,22 @@ export class SecurityManager {
   private auditLogs: AuditLogEntry[] = [];
 
   // SQL injection patterns to detect and block
+  // Note: These patterns target specific injection techniques, not normal SQL keywords
   private readonly dangerousPatterns = [
-    /(\b(union|select|insert|update|delete|drop|create|alter|exec|execute|sp_|xp_)\b.*\b(from|into|where|set|values|table|database|schema)\b)/gi,
-    /(;|\|\||&&|\/\*|\*\/|--|\#)/g,
+    // Detect UNION-based injection attempts (UNION followed by SELECT)
+    /\bUNION\s+(ALL\s+)?SELECT\b/gi,
+    // Detect comment-based attacks and statement terminators used for injection
+    /(;\s*--|\|\||&&|\/\*|\*\/|--\s*$|#\s*$)/g,
+    // Detect XSS attempts in SQL values
     /(\b(script|javascript|vbscript|onload|onerror|onclick)\b)/gi,
-    /(\b(eval|exec|system|shell|cmd)\b)/gi,
-    /((\%27)|(\')|(\\x27)|(\\u0027))/gi,
-    /((\%22)|(\")|(\\x22)|(\\u0022))/gi,
-    /(\b(or|and)\b\s*(\d+\s*=\s*\d+|\'\w*\'\s*=\s*\'\w*\'))/gi
+    // Detect OS command injection attempts
+    /(\b(eval|system|shell_exec|passthru)\s*\()/gi,
+    // Detect hex/unicode encoded quotes commonly used in injection
+    /((\%27)|(\\x27)|(\\u0027)|(\%22)|(\\x22)|(\\u0022))/gi,
+    // Detect tautology-based injection (OR 1=1, AND 'a'='a', etc.)
+    /(\b(or|and)\b\s*[\'\"]?\w*[\'\"]?\s*=\s*[\'\"]?\w*[\'\"]?\s*(?:--|#|\/\*|$))/gi,
+    // Detect stacked queries (semicolon followed by SQL keyword)
+    /(;\s*\b(select|insert|update|delete|drop|create|alter|truncate|exec)\b)/gi
   ];
 
   // SQL keywords that require specific permissions

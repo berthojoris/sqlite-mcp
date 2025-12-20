@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.7] - 2025-12-20
+
+### Fixed
+- **SQL Injection in Bulk Operations**: Added `safeIdentifier` validation for table and column names in `bulkInsert`, `bulkUpdate`, and `bulkDelete` operations
+- **SQL Injection in PRAGMA Calls**: Added `isValidIdentifier` validation for table names in schema introspection PRAGMA commands (`table_info`, `foreign_key_list`, `index_list`)
+- **Overly Aggressive Security Pattern**: Refined SQL injection detection patterns to avoid false positives on legitimate queries (e.g., normal SELECT statements)
+- **Unused Imports**: Removed unused `ImageContent` and `EmbeddedResource` imports from mcp-server.ts
+
 ## [1.1.6] - 2025-12-20
 
 ### Improved
