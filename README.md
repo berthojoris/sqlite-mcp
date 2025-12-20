@@ -15,7 +15,7 @@ A comprehensive Model Context Protocol (MCP) server implementation for SQLite da
   - [Cursor IDE](#cursor-ide)
   - [Continue.dev](#continuedev)
   - [Other MCP Clients](#other-mcp-clients)
-- [Available Tools (13 Tools)](#-available-tools)
+- [Available Tools (18 Tools)](#-available-tools)
 - [Tool Documentation](DOCUMENTATIONS.md)
 - [Permission System](#permission-system)
 - [Configuration](#-configuration)
@@ -451,7 +451,7 @@ mcp-sqlite-server config --template --output mcp-template.json
 
 ## 🔌 Available Tools
 
-The MCP server provides **13 powerful tools** for comprehensive SQLite database management:
+The MCP server provides **18 powerful tools** for comprehensive SQLite database management:
 
 ### Tools Summary
 
@@ -470,6 +470,11 @@ The MCP server provides **13 powerful tools** for comprehensive SQLite database 
 | 11 | [`sqlite_bulk_update`](#sqlite_bulk_update) | Bulk update with progress tracking | `update` |
 | 12 | [`sqlite_bulk_delete`](#sqlite_bulk_delete) | Bulk delete with cascade support | `delete` |
 | 13 | [`sqlite_ddl`](#sqlite_ddl) | Schema management (CREATE/ALTER/DROP) | `ddl` |
+| 14 | [`sqlite_views`](#sqlite_views) | Create and manage database views | `ddl` |
+| 15 | [`sqlite_indexes`](#sqlite_indexes) | Index management and optimization | `list`, `ddl` |
+| 16 | [`sqlite_constraints`](#sqlite_constraints) | View constraints and foreign keys | `list` |
+| 17 | [`sqlite_migrate`](#sqlite_migrate) | Data migration between tables | `read`, `create`, `update` |
+| 18 | [`sqlite_backup_restore`](#sqlite_backup_restore) | Backup tables and restore from SQL | `utility`, `read`, `ddl` |
 
 ### Tool Categories
 
@@ -491,10 +496,19 @@ The MCP server provides **13 powerful tools** for comprehensive SQLite database 
 
 **Schema Management:**
 - `sqlite_ddl` - CREATE/ALTER/DROP tables and indexes
+- `sqlite_views` - Create, drop, and manage database views
+- `sqlite_indexes` - Index management and optimization
+
+**Constraints & Relationships:**
+- `sqlite_constraints` - View and analyze constraints and foreign keys
+
+**Data Migration:**
+- `sqlite_migrate` - Clone tables, compare structures, and copy data
 
 **Database Operations:**
 - `sqlite_transaction` - Atomic multi-query execution
 - `sqlite_backup` - Database backup utility
+- `sqlite_backup_restore` - Backup tables and restore from SQL files
 
 > 📖 **Full Documentation:** See [DOCUMENTATIONS.md](DOCUMENTATIONS.md) for detailed parameters, examples, and response formats for each tool.
 
@@ -547,4 +561,4 @@ For issues, questions, or contributions:
 
 ---
 
-**Last Updated**: 2025-12-20 18:45:00
+**Last Updated**: 2025-12-20 20:00:00

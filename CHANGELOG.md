@@ -2,6 +2,46 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2025-12-20
+
+### Added
+- **New Tool: `sqlite_views`**: Comprehensive database view management
+  - `create_view` - Create new views with SELECT queries
+  - `drop_view` - Drop existing views
+  - `list_views` - List all views in the database
+  - `get_view_info` - Retrieve detailed view information and definitions
+  - Support for IF NOT EXISTS and IF EXISTS clauses
+
+- **New Tool: `sqlite_indexes`**: Index management and performance optimization
+  - `list_indexes` - List all indexes in the database
+  - `get_index_info` - Get detailed index information including columns and uniqueness
+  - `analyze_index` - Analyze index statistics for query optimization
+
+- **New Tool: `sqlite_constraints`**: Constraint and data integrity management
+  - `list_constraints` - View all constraints across tables or specific table
+  - `list_foreign_keys` - List all foreign key relationships with cascade rules
+
+- **New Tool: `sqlite_migrate`**: Data migration and synchronization between tables
+  - `clone_table` - Clone table structure and optionally data
+  - `compare_structure` - Compare table structures to identify differences
+  - `copy_data` - Copy data between tables with optional filtering (WHERE clause)
+
+- **New Tool: `sqlite_backup_restore`**: Backup and restore operations
+  - `backup_table` - Backup specific table to SQL file with data and schema
+  - `restore_from_sql` - Restore database from SQL file
+  - `get_create_statement` - Retrieve CREATE TABLE statement for any table
+
+- **Database Manager Methods**: 25+ new methods supporting view, index, constraint, and migration operations
+  - View operations: `createView`, `dropView`, `getViewInfo`, `listViews`
+  - Index operations: `getIndexInfo`, `listIndexes`, `analyzeIndex`
+  - Constraint operations: `listConstraints`, `listForeignKeys`
+  - Migration operations: `cloneTable`, `compareTableStructure`, `copyTableData`
+  - Backup operations: `backupTable`, `restoreFromSQL`, `getCreateTableStatement`
+
+### Changed
+- Incremented tool count from 13 to 18 in documentation
+- Updated total available tools from 13 to 18 in README and AGENTS.md
+
 ## [1.1.8] - 2025-12-20
 
 ### Added

@@ -1161,6 +1161,536 @@ export class DatabaseManager {
   }
 
   /**
+   * Create a view
+   */
+  public createView(viewName: string, selectQuery: string, ifNotExists: boolean = false): any {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    const safeViewName = safeIdentifier(viewName, 'view name');
+    const query = `CREATE VIEW ${ifNotExists ? 'IF NOT EXISTS ' : ''}${safeViewName} AS ${selectQuery}`;
+    
+    try {
+      this.db.exec(query);
+      return {
+        success: true,
+        message: `View ${viewName} created successfully`,
+        executionTime: 0
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: (error as Error).message,
+        executionTime: 0
+      };
+    }
+  }
+
+  /**
+   * Drop a view
+   */
+  public dropView(viewName: string, ifExists: boolean = false): any {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    const safeViewName = safeIdentifier(viewName, 'view name');
+    const query = `DROP VIEW ${ifExists ? 'IF EXISTS ' : ''}${safeViewName}`;
+    
+    try {
+      this.db.exec(query);
+      return {
+        success: true,
+        message: `View ${viewName} dropped successfully`,
+        executionTime: 0
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: (error as Error).message,
+        executionTime: 0
+      };
+    }
+  }
+
+  /**
+   * Get view information
+   */
+  public getViewInfo(viewName: string): any {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    if (!isValidIdentifier(viewName)) {
+      throw new Error(`Invalid view name: ${viewName}`);
+    }
+
+    const viewQuery = `
+      SELECT name, sql as definition, type
+      FROM sqlite_master 
+      WHERE type = 'view' 
+      AND name = ?
+    `;
+    
+    const view = this.db.prepare(viewQuery).get(viewName);
+    
+    if (!view) {
+      throw new Error(`View ${viewName} not found`);
+    }
+
+    return view;
+  }
+
+  /**
+   * List all views
+   */
+  public listViews(): any[] {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    const query = `
+      SELECT name, sql as definition, type
+      FROM sqlite_master 
+      WHERE type = 'view'
+      ORDER BY name
+    `;
+    
+    return this.db.prepare(query).all();
+  }
+
+  /**
+   * Get index information
+   */
+  public getIndexInfo(indexName: string): any {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    if (!isValidIdentifier(indexName)) {
+      throw new Error(`Invalid index name: ${indexName}`);
+    }
+
+    const indexQuery = `
+      SELECT name, tbl_name as table_name, sql, unique
+      FROM sqlite_master 
+      WHERE type = 'index' 
+      AND name = ?
+    `;
+    
+    const index = this.db.prepare(indexQuery).get(indexName);
+    
+    if (!index) {
+      throw new Error(`Index ${indexName} not found`);
+    }
+
+    // Get index columns
+    const columnsQuery = `PRAGMA index_info("${indexName}")`;
+    const columns = this.db.prepare(columnsQuery).all();
+
+    return {
+      ...index,
+      columns: columns.map((col: any) => ({
+        name: col.name,
+        seqno: col.seqno,
+        desc: col.desc === 1
+      }))
+    };
+  }
+
+  /**
+   * List all indexes
+   */
+  public listIndexes(): any[] {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    const query = `
+      SELECT name, tbl_name as table_name, sql, unique
+      FROM sqlite_master 
+      WHERE type = 'index'
+      AND name NOT LIKE 'sqlite_%'
+      ORDER BY name
+    `;
+    
+    return this.db.prepare(query).all();
+  }
+
+  /**
+   * Analyze index to get statistics
+   */
+  public analyzeIndex(indexName: string): any {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    try {
+      // Run ANALYZE on the index
+      this.db.exec(`ANALYZE ${safeIdentifier(indexName, 'index name')}`);
+      
+      // Get index statistics
+      const statsQuery = `
+        SELECT 
+          sqlite_stat1.name as index_name,
+          sqlite_stat1.stat as statistics
+        FROM sqlite_stat1
+        WHERE name = ?
+      `;
+      
+      const stats = this.db.prepare(statsQuery).get(indexName) as any;
+      
+      return {
+        success: true,
+        index: indexName,
+        statistics: stats ? stats.statistics : null,
+        analyzed_at: new Date().toISOString()
+      };
+    } catch (error) {
+      throw new Error(`Failed to analyze index: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * List all constraints
+   */
+  public listConstraints(tableName?: string): any[] {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    if (tableName && !isValidIdentifier(tableName)) {
+      throw new Error(`Invalid table name: ${tableName}`);
+    }
+
+    const query = `
+      SELECT 
+        m.name as table_name,
+        CASE 
+          WHEN type = 'c' THEN 'CHECK'
+          WHEN type = 'u' THEN 'UNIQUE'
+          WHEN type = 'f' THEN 'FOREIGN KEY'
+          WHEN type = 'pk' THEN 'PRIMARY KEY'
+          ELSE type
+        END as constraint_type,
+        p.cid as constraint_id,
+        p.name as column_name
+      FROM sqlite_master m
+      JOIN pragma_table_info(m.name) p ON 1=1
+      WHERE m.type = 'table'
+      ${tableName ? `AND m.name = ?` : ''}
+      ORDER BY m.name, p.cid
+    `;
+    
+    if (tableName) {
+      return this.db.prepare(query).all(tableName);
+    } else {
+      return this.db.prepare(query).all();
+    }
+  }
+
+  /**
+   * List foreign keys
+   */
+  public listForeignKeys(tableName?: string): any[] {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    if (tableName && !isValidIdentifier(tableName)) {
+      throw new Error(`Invalid table name: ${tableName}`);
+    }
+
+    let result: any[] = [];
+
+    if (tableName) {
+      // Get foreign keys for specific table
+      const fkQuery = `PRAGMA foreign_key_list("${tableName}")`;
+      result = this.db.prepare(fkQuery).all();
+    } else {
+      // Get all foreign keys from all tables
+      const tablesQuery = `
+        SELECT name FROM sqlite_master 
+        WHERE type = 'table' 
+        AND name NOT LIKE 'sqlite_%'
+      `;
+      
+      const tables = this.db.prepare(tablesQuery).all() as Array<{ name: string }>;
+      
+      for (const table of tables) {
+        const fkQuery = `PRAGMA foreign_key_list("${table.name}")`;
+        const fks = this.db.prepare(fkQuery).all() as any[];
+        fks.forEach(fk => {
+          result.push({
+            ...fk,
+            table_name: table.name
+          });
+        });
+      }
+    }
+
+    return result.map(fk => ({
+      table: fk.table_name || tableName,
+      column: fk.from,
+      referenced_table: fk.table,
+      referenced_column: fk.to,
+      seq: fk.seq,
+      on_delete: fk.on_delete,
+      on_update: fk.on_update
+    }));
+  }
+
+  /**
+   * Clone a table (structure and data)
+   */
+  public cloneTable(sourceTable: string, targetTable: string, includeData: boolean = true): any {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    if (!isValidIdentifier(sourceTable) || !isValidIdentifier(targetTable)) {
+      throw new Error('Invalid table name');
+    }
+
+    const connection = this.getConnection();
+    
+    try {
+      const transaction = connection.transaction(() => {
+        // Get CREATE TABLE statement
+        const createStmt = connection.prepare(`
+          SELECT sql FROM sqlite_master 
+          WHERE type = 'table' AND name = ?
+        `).get(sourceTable) as any;
+
+        if (!createStmt || !createStmt.sql) {
+          throw new Error(`Source table ${sourceTable} not found`);
+        }
+
+        // Modify CREATE TABLE statement for target
+        let createQuery = createStmt.sql.replace(
+          new RegExp(`\\b${sourceTable}\\b`, 'i'),
+          targetTable
+        );
+
+        // Execute CREATE TABLE
+        connection.exec(createQuery);
+
+        // Copy data if requested
+        if (includeData) {
+          const copyQuery = `INSERT INTO ${safeIdentifier(targetTable, 'table name')} SELECT * FROM ${safeIdentifier(sourceTable, 'table name')}`;
+          connection.exec(copyQuery);
+        }
+      });
+
+      transaction();
+
+      return {
+        success: true,
+        message: `Table ${sourceTable} cloned to ${targetTable}`,
+        executionTime: 0
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: (error as Error).message,
+        executionTime: 0
+      };
+    } finally {
+      this.returnConnection(connection);
+    }
+  }
+
+  /**
+   * Compare table structures
+   */
+  public compareTableStructure(table1: string, table2: string): any {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    if (!isValidIdentifier(table1) || !isValidIdentifier(table2)) {
+      throw new Error('Invalid table name');
+    }
+
+    const getColumns = (tableName: string) => {
+      const query = `PRAGMA table_info("${tableName}")`;
+      return this.db!.prepare(query).all() as any[];
+    };
+
+    const cols1 = getColumns(table1);
+    const cols2 = getColumns(table2);
+
+    const differences = {
+      only_in_table1: [] as any[],
+      only_in_table2: [] as any[],
+      different_types: [] as any[],
+      same_structure: true
+    };
+
+    const cols2ByName = new Map(cols2.map((c: any) => [c.name, c]));
+
+    // Find differences
+    for (const col1 of cols1) {
+      if (!cols2ByName.has(col1.name)) {
+        differences.only_in_table1.push(col1);
+        differences.same_structure = false;
+      } else {
+        const col2 = cols2ByName.get(col1.name);
+        if (col1.type !== col2.type) {
+          differences.different_types.push({
+            column: col1.name,
+            type_in_table1: col1.type,
+            type_in_table2: col2.type
+          });
+          differences.same_structure = false;
+        }
+      }
+    }
+
+    for (const col2 of cols2) {
+      if (!new Map(cols1.map((c: any) => [c.name, c])).has(col2.name)) {
+        differences.only_in_table2.push(col2);
+        differences.same_structure = false;
+      }
+    }
+
+    return differences;
+  }
+
+  /**
+   * Copy table data
+   */
+  public copyTableData(sourceTable: string, targetTable: string, whereClause?: string): any {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    if (!isValidIdentifier(sourceTable) || !isValidIdentifier(targetTable)) {
+      return {
+        success: false,
+        error: 'Invalid table name',
+        executionTime: 0
+      };
+    }
+
+    try {
+      const baseSql = `INSERT INTO ${safeIdentifier(targetTable, 'table name')} SELECT * FROM ${safeIdentifier(sourceTable, 'table name')}`;
+      const query = whereClause ? `${baseSql} WHERE ${whereClause}` : baseSql;
+      
+      const result = this.db.prepare(query).run();
+
+      return {
+        success: true,
+        rowsCopied: result.changes,
+        executionTime: 0
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: (error as Error).message,
+        executionTime: 0
+      };
+    }
+  }
+
+  /**
+   * Get CREATE TABLE statement
+   */
+  public getCreateTableStatement(tableName: string): any {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    if (!isValidIdentifier(tableName)) {
+      throw new Error(`Invalid table name: ${tableName}`);
+    }
+
+    const query = `
+      SELECT sql as create_statement
+      FROM sqlite_master 
+      WHERE type = 'table' 
+      AND name = ?
+    `;
+    
+    const result = this.db.prepare(query).get(tableName);
+    
+    if (!result) {
+      throw new Error(`Table ${tableName} not found`);
+    }
+
+    return result;
+  }
+
+  /**
+   * Restore database from SQL file
+   */
+  public async restoreFromSQL(sqlPath: string): Promise<any> {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    try {
+      if (!fs.existsSync(sqlPath)) {
+        return {
+          success: false,
+          error: `SQL file not found: ${sqlPath}`,
+          executionTime: 0
+        };
+      }
+
+      const sqlContent = fs.readFileSync(sqlPath, 'utf-8');
+      const connection = this.getConnection();
+
+      try {
+        const transaction = connection.transaction(() => {
+          connection.exec(sqlContent);
+        });
+
+        transaction();
+
+        return {
+          success: true,
+          message: 'Database restored successfully',
+          executionTime: 0
+        };
+      } finally {
+        this.returnConnection(connection);
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: (error as Error).message,
+        executionTime: 0
+      };
+    }
+  }
+
+  /**
+   * Backup specific table to SQL file
+   */
+  public backupTable(tableName: string, backupPath: string): any {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    if (!isValidIdentifier(tableName)) {
+      return {
+        success: false,
+        error: 'Invalid table name',
+        executionTime: 0
+      };
+    }
+
+    try {
+      const createStmt = this.getCreateTableStatement(tableName);
+      const query = `SELECT * FROM ${safeIdentifier(tableName, 'table name')}`;
+      const data = this.db.prepare(query).all() as any[];
+
+      // Build INSERT statements
+      let sqlContent = createStmt.create_statement + ';\n\n';
+      
+      if (data.length > 0) {
+        const columns = Object.keys(data[0]);
+        for (const row of data) {
+          const values = columns.map(col => {
+            const val = (row as any)[col];
+            if (val === null) return 'NULL';
+            if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`;
+            return val;
+          });
+          sqlContent += `INSERT INTO ${safeIdentifier(tableName, 'table name')} VALUES (${values.join(', ')});\n`;
+        }
+      }
+
+      fs.writeFileSync(backupPath, sqlContent);
+
+      return {
+        success: true,
+        message: `Table ${tableName} backed up successfully`,
+        rowsBackedUp: data.length,
+        executionTime: 0
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: (error as Error).message,
+        executionTime: 0
+      };
+    }
+  }
+
+  /**
    * Close all database connections
    */
   public close(): void {

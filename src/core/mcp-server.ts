@@ -454,6 +454,138 @@ export class MCPSQLiteServer {
           required: ['table']
         },
         requiredPermissions: ['list']
+      },
+      {
+        name: 'sqlite_views',
+        description: 'Create, drop, list, and retrieve information about database views. Views are virtual tables based on SELECT queries. Use create_view to define a new view, drop_view to remove it, list_views to see all views, and get_view_info to inspect a specific view.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            operation: {
+              type: 'string',
+              enum: ['create_view', 'drop_view', 'list_views', 'get_view_info'],
+              description: 'View operation: create_view, drop_view, list_views, or get_view_info'
+            },
+            viewName: {
+              type: 'string',
+              description: 'Name of the view (required for all operations except list_views). Example: "active_users"'
+            },
+            selectQuery: {
+              type: 'string',
+              description: 'SQL SELECT query for create_view operation. Example: "SELECT * FROM users WHERE status = \'active\'"'
+            },
+            ifNotExists: {
+              type: 'boolean',
+              description: 'Add IF NOT EXISTS clause for create_view to prevent errors if view already exists (default: false)'
+            },
+            ifExists: {
+              type: 'boolean',
+              description: 'Add IF EXISTS clause for drop_view to prevent errors if view does not exist (default: false)'
+            }
+          },
+          required: ['operation']
+        },
+        requiredPermissions: ['ddl']
+      },
+      {
+        name: 'sqlite_indexes',
+        description: 'Manage indexes for performance optimization. List all indexes, analyze index statistics for query optimization, and get detailed index information including columns and uniqueness constraints.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            operation: {
+              type: 'string',
+              enum: ['list_indexes', 'get_index_info', 'analyze_index'],
+              description: 'Index operation: list_indexes (no parameters), get_index_info (requires indexName), or analyze_index (requires indexName)'
+            },
+            indexName: {
+              type: 'string',
+              description: 'Name of the index for get_index_info and analyze_index operations. Example: "idx_users_email"'
+            }
+          },
+          required: ['operation']
+        },
+        requiredPermissions: ['list', 'ddl']
+      },
+      {
+        name: 'sqlite_constraints',
+        description: 'View and manage database constraints including primary keys, foreign keys, unique constraints, and check constraints. Use to list all constraints, view foreign keys with cascade rules, and understand data integrity requirements.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            operation: {
+              type: 'string',
+              enum: ['list_constraints', 'list_foreign_keys'],
+              description: 'Constraint operation: list_constraints or list_foreign_keys'
+            },
+            tableName: {
+              type: 'string',
+              description: 'Optional table name to filter constraints/foreign keys. If omitted, shows all constraints across all tables. Example: "users"'
+            }
+          },
+          required: ['operation']
+        },
+        requiredPermissions: ['list']
+      },
+      {
+        name: 'sqlite_migrate',
+        description: 'Migrate and synchronize data between tables. Supports cloning tables (structure and data), comparing table structures, and copying data between tables with optional filtering.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            operation: {
+              type: 'string',
+              enum: ['clone_table', 'compare_structure', 'copy_data'],
+              description: 'Migration operation: clone_table, compare_structure, or copy_data'
+            },
+            sourceTable: {
+              type: 'string',
+              description: 'Source table name for clone_table and copy_data operations. Example: "users_old"'
+            },
+            targetTable: {
+              type: 'string',
+              description: 'Target/destination table name. Required for clone_table and copy_data operations. Example: "users_new"'
+            },
+            includeData: {
+              type: 'boolean',
+              description: 'For clone_table: include data from source table (default: true). If false, clones only the structure.'
+            },
+            whereClause: {
+              type: 'string',
+              description: 'Optional WHERE condition for copy_data to copy only matching rows. Example: "status = \'active\' AND created_at > \'2024-01-01\'"'
+            }
+          },
+          required: ['operation']
+        },
+        requiredPermissions: ['read', 'create', 'update']
+      },
+      {
+        name: 'sqlite_backup_restore',
+        description: 'Create backups and restore databases. Backup specific tables to SQL files with data and schema, retrieve CREATE TABLE statements, and restore databases from SQL files.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            operation: {
+              type: 'string',
+              enum: ['backup_table', 'restore_from_sql', 'get_create_statement'],
+              description: 'Backup/restore operation: backup_table, restore_from_sql, or get_create_statement'
+            },
+            tableName: {
+              type: 'string',
+              description: 'Table name for backup_table and get_create_statement operations. Example: "users"'
+            },
+            backupPath: {
+              type: 'string',
+              description: 'File path for backup_table operation. Path where to save the SQL backup. Example: "/backups/users_backup.sql" or "C:\\backups\\users_backup.sql"'
+            },
+            sqlPath: {
+              type: 'string',
+              description: 'Path to SQL file for restore_from_sql operation. Example: "/backups/restore.sql"'
+            }
+          },
+          required: ['operation']
+        },
+        requiredPermissions: ['utility', 'read', 'ddl']
       }
     ];
 
@@ -525,6 +657,21 @@ export class MCPSQLiteServer {
       
       case 'sqlite_relations':
         return this.handleRelations(args, clientId, clientPermissions);
+      
+      case 'sqlite_views':
+        return this.handleViews(args, clientId, clientPermissions);
+      
+      case 'sqlite_indexes':
+        return this.handleIndexes(args, clientId, clientPermissions);
+      
+      case 'sqlite_constraints':
+        return this.handleConstraints(args, clientId, clientPermissions);
+      
+      case 'sqlite_migrate':
+        return this.handleMigrate(args, clientId, clientPermissions);
+      
+      case 'sqlite_backup_restore':
+        return this.handleBackupRestore(args, clientId, clientPermissions);
       
       default:
         throw new Error(`Unknown tool: ${toolName}`);
@@ -1239,6 +1386,306 @@ export class MCPSQLiteServer {
       };
     } catch (error) {
       throw new Error(`Relationship analysis failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Handle view operations
+   */
+  private async handleViews(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { operation, viewName, selectQuery, ifNotExists, ifExists } = args;
+
+    if (!permissions.includes('ddl')) {
+      throw new Error('Insufficient permissions for view operations');
+    }
+
+    try {
+      let result: any;
+
+      switch (operation) {
+        case 'create_view':
+          if (!viewName || !selectQuery) {
+            throw new Error('viewName and selectQuery are required for create_view');
+          }
+          result = this.databaseManager.createView(viewName, selectQuery, ifNotExists);
+          break;
+
+        case 'drop_view':
+          if (!viewName) {
+            throw new Error('viewName is required for drop_view');
+          }
+          result = this.databaseManager.dropView(viewName, ifExists);
+          break;
+
+        case 'list_views':
+          result = {
+            success: true,
+            data: this.databaseManager.listViews(),
+            executionTime: 0
+          };
+          break;
+
+        case 'get_view_info':
+          if (!viewName) {
+            throw new Error('viewName is required for get_view_info');
+          }
+          result = {
+            success: true,
+            data: this.databaseManager.getViewInfo(viewName),
+            executionTime: 0
+          };
+          break;
+
+        default:
+          throw new Error(`Unknown view operation: ${operation}`);
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          } as TextContent
+        ]
+      };
+    } catch (error) {
+      throw new Error(`View operation failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Handle index operations
+   */
+  private async handleIndexes(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { operation, indexName } = args;
+
+    if (!permissions.includes('list') && !permissions.includes('ddl')) {
+      throw new Error('Insufficient permissions for index operations');
+    }
+
+    try {
+      let result: any;
+
+      switch (operation) {
+        case 'list_indexes':
+          result = {
+            success: true,
+            data: this.databaseManager.listIndexes(),
+            executionTime: 0
+          };
+          break;
+
+        case 'get_index_info':
+          if (!indexName) {
+            throw new Error('indexName is required for get_index_info');
+          }
+          result = {
+            success: true,
+            data: this.databaseManager.getIndexInfo(indexName),
+            executionTime: 0
+          };
+          break;
+
+        case 'analyze_index':
+          if (!indexName) {
+            throw new Error('indexName is required for analyze_index');
+          }
+          result = this.databaseManager.analyzeIndex(indexName);
+          break;
+
+        default:
+          throw new Error(`Unknown index operation: ${operation}`);
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          } as TextContent
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Index operation failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Handle constraint operations
+   */
+  private async handleConstraints(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { operation, tableName } = args;
+
+    if (!permissions.includes('list')) {
+      throw new Error('Insufficient permissions for constraint operations');
+    }
+
+    try {
+      let result: any;
+
+      switch (operation) {
+        case 'list_constraints':
+          result = {
+            success: true,
+            data: this.databaseManager.listConstraints(tableName),
+            executionTime: 0
+          };
+          break;
+
+        case 'list_foreign_keys':
+          result = {
+            success: true,
+            data: this.databaseManager.listForeignKeys(tableName),
+            executionTime: 0
+          };
+          break;
+
+        default:
+          throw new Error(`Unknown constraint operation: ${operation}`);
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          } as TextContent
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Constraint operation failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Handle data migration operations
+   */
+  private async handleMigrate(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { operation, sourceTable, targetTable, includeData, whereClause } = args;
+
+    if (!permissions.includes('read') || !permissions.includes('create')) {
+      throw new Error('Insufficient permissions for migration operations');
+    }
+
+    try {
+      let result: any;
+
+      switch (operation) {
+        case 'clone_table':
+          if (!sourceTable || !targetTable) {
+            throw new Error('sourceTable and targetTable are required for clone_table');
+          }
+          result = this.databaseManager.cloneTable(sourceTable, targetTable, includeData !== false);
+          break;
+
+        case 'compare_structure':
+          if (!sourceTable || !targetTable) {
+            throw new Error('sourceTable and targetTable are required for compare_structure');
+          }
+          result = {
+            success: true,
+            data: this.databaseManager.compareTableStructure(sourceTable, targetTable),
+            executionTime: 0
+          };
+          break;
+
+        case 'copy_data':
+          if (!sourceTable || !targetTable) {
+            throw new Error('sourceTable and targetTable are required for copy_data');
+          }
+          result = this.databaseManager.copyTableData(sourceTable, targetTable, whereClause);
+          break;
+
+        default:
+          throw new Error(`Unknown migration operation: ${operation}`);
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          } as TextContent
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Migration operation failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Handle backup and restore operations
+   */
+  private async handleBackupRestore(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { operation, tableName, backupPath, sqlPath } = args;
+
+    if (!permissions.includes('utility') && !permissions.includes('read')) {
+      throw new Error('Insufficient permissions for backup/restore operations');
+    }
+
+    try {
+      let result: any;
+
+      switch (operation) {
+        case 'backup_table':
+          if (!tableName || !backupPath) {
+            throw new Error('tableName and backupPath are required for backup_table');
+          }
+          result = this.databaseManager.backupTable(tableName, backupPath);
+          break;
+
+        case 'restore_from_sql':
+          if (!sqlPath) {
+            throw new Error('sqlPath is required for restore_from_sql');
+          }
+          result = await this.databaseManager.restoreFromSQL(sqlPath);
+          break;
+
+        case 'get_create_statement':
+          if (!tableName) {
+            throw new Error('tableName is required for get_create_statement');
+          }
+          result = {
+            success: true,
+            data: this.databaseManager.getCreateTableStatement(tableName),
+            executionTime: 0
+          };
+          break;
+
+        default:
+          throw new Error(`Unknown backup/restore operation: ${operation}`);
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          } as TextContent
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Backup/restore operation failed: ${(error as Error).message}`);
     }
   }
 
