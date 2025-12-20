@@ -42,7 +42,7 @@ export class MCPSQLiteServer {
     this.server = new Server(
       {
         name: 'sqlite-mcp-server',
-        version: '1.1.8',
+        version: '1.3.0',
         description: 'SQLite database server implementing the Model Context Protocol'
       },
       {
@@ -586,6 +586,105 @@ export class MCPSQLiteServer {
           required: ['operation']
         },
         requiredPermissions: ['utility', 'read', 'ddl']
+      },
+      {
+        name: 'sqlite_column_statistics',
+        description: 'Get detailed statistics about columns in a table including row counts, distinct values, null counts, min/max values, and averages. Useful for data profiling and quality analysis.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            tableName: {
+              type: 'string',
+              description: 'Name of the table to analyze. Example: "users"'
+            }
+          },
+          required: ['tableName']
+        },
+        requiredPermissions: ['read']
+      },
+      {
+        name: 'sqlite_database_summary',
+        description: 'Get a comprehensive summary of the database including file size, table/view counts, total rows, index count, and configuration settings like WAL mode.',
+        inputSchema: {
+          type: 'object',
+          properties: {}
+        },
+        requiredPermissions: ['read']
+      },
+      {
+        name: 'sqlite_schema_erd',
+        description: 'Generate Entity Relationship Diagram (ERD) data showing all tables, columns, and foreign key relationships. Output can be used with visualization tools.',
+        inputSchema: {
+          type: 'object',
+          properties: {}
+        },
+        requiredPermissions: ['read']
+      },
+      {
+        name: 'sqlite_schema_rag_context',
+        description: 'Generate schema context formatted for RAG (Retrieval-Augmented Generation) and AI models. Includes detailed table structures, columns, types, and relationships in markdown format.',
+        inputSchema: {
+          type: 'object',
+          properties: {}
+        },
+        requiredPermissions: ['read']
+      },
+      {
+        name: 'sqlite_analyze_query',
+        description: 'Analyze a SQL query to understand its execution plan, complexity, and accessed tables. Returns the EXPLAIN QUERY PLAN output and query metrics.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'SQL query to analyze. Example: "SELECT * FROM orders WHERE user_id = 1"'
+            }
+          },
+          required: ['query']
+        },
+        requiredPermissions: ['read']
+      },
+      {
+        name: 'sqlite_optimization_hints',
+        description: 'Get optimization suggestions for a SQL query. Identifies common performance issues like SELECT *, leading wildcards, missing indexes, and suggests improvements.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'SQL query to get optimization hints for. Example: "SELECT * FROM users WHERE name LIKE \'%john%\'"'
+            }
+          },
+          required: ['query']
+        },
+        requiredPermissions: ['read']
+      },
+      {
+        name: 'sqlite_database_health_check',
+        description: 'Perform a comprehensive health check on the database. Checks integrity, foreign key consistency, and schema validity. Returns status and detailed check results.',
+        inputSchema: {
+          type: 'object',
+          properties: {}
+        },
+        requiredPermissions: ['read']
+      },
+      {
+        name: 'sqlite_unused_indexes',
+        description: 'Identify potentially unused or redundant indexes in the database. Helps with performance optimization by finding indexes that can be safely removed.',
+        inputSchema: {
+          type: 'object',
+          properties: {}
+        },
+        requiredPermissions: ['read']
+      },
+      {
+        name: 'sqlite_connection_pool_stats',
+        description: 'Get statistics about the connection pool including active connections, pool size, and connection availability.',
+        inputSchema: {
+          type: 'object',
+          properties: {}
+        },
+        requiredPermissions: ['read']
       }
     ];
 
@@ -672,6 +771,33 @@ export class MCPSQLiteServer {
       
       case 'sqlite_backup_restore':
         return this.handleBackupRestore(args, clientId, clientPermissions);
+      
+      case 'sqlite_column_statistics':
+        return this.handleColumnStatistics(args, clientId, clientPermissions);
+      
+      case 'sqlite_database_summary':
+        return this.handleDatabaseSummary(args, clientId, clientPermissions);
+      
+      case 'sqlite_schema_erd':
+        return this.handleSchemaERD(args, clientId, clientPermissions);
+      
+      case 'sqlite_schema_rag_context':
+        return this.handleSchemaRAGContext(args, clientId, clientPermissions);
+      
+      case 'sqlite_analyze_query':
+        return this.handleAnalyzeQuery(args, clientId, clientPermissions);
+      
+      case 'sqlite_optimization_hints':
+        return this.handleOptimizationHints(args, clientId, clientPermissions);
+      
+      case 'sqlite_database_health_check':
+        return this.handleDatabaseHealthCheck(args, clientId, clientPermissions);
+      
+      case 'sqlite_unused_indexes':
+        return this.handleUnusedIndexes(args, clientId, clientPermissions);
+      
+      case 'sqlite_connection_pool_stats':
+        return this.handleConnectionPoolStats(args, clientId, clientPermissions);
       
       default:
         throw new Error(`Unknown tool: ${toolName}`);
@@ -1686,6 +1812,276 @@ export class MCPSQLiteServer {
       };
     } catch (error) {
       throw new Error(`Backup/restore operation failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Handle column statistics request
+   */
+  private async handleColumnStatistics(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { tableName } = args;
+
+    if (!permissions.includes('read')) {
+      throw new Error('Insufficient permissions for column statistics');
+    }
+
+    if (!tableName) {
+      throw new Error('tableName is required');
+    }
+
+    try {
+      const result = this.databaseManager.getColumnStatistics(tableName);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          } as TextContent
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Column statistics request failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Handle database summary request
+   */
+  private async handleDatabaseSummary(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    if (!permissions.includes('read')) {
+      throw new Error('Insufficient permissions for database summary');
+    }
+
+    try {
+      const result = this.databaseManager.getDatabaseSummary();
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          } as TextContent
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Database summary request failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Handle schema ERD request
+   */
+  private async handleSchemaERD(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    if (!permissions.includes('read')) {
+      throw new Error('Insufficient permissions for schema ERD');
+    }
+
+    try {
+      const result = this.databaseManager.getSchemaERD();
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          } as TextContent
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Schema ERD request failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Handle schema RAG context request
+   */
+  private async handleSchemaRAGContext(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    if (!permissions.includes('read')) {
+      throw new Error('Insufficient permissions for schema RAG context');
+    }
+
+    try {
+      const result = this.databaseManager.getSchemaRAGContext();
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          } as TextContent
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Schema RAG context request failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Handle query analysis request
+   */
+  private async handleAnalyzeQuery(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { query } = args;
+
+    if (!permissions.includes('read')) {
+      throw new Error('Insufficient permissions for query analysis');
+    }
+
+    if (!query) {
+      throw new Error('query is required');
+    }
+
+    try {
+      const result = this.databaseManager.analyzeQuery(query);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          } as TextContent
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Query analysis request failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Handle optimization hints request
+   */
+  private async handleOptimizationHints(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { query } = args;
+
+    if (!permissions.includes('read')) {
+      throw new Error('Insufficient permissions for optimization hints');
+    }
+
+    if (!query) {
+      throw new Error('query is required');
+    }
+
+    try {
+      const result = this.databaseManager.getOptimizationHints(query);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          } as TextContent
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Optimization hints request failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Handle database health check request
+   */
+  private async handleDatabaseHealthCheck(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    if (!permissions.includes('read')) {
+      throw new Error('Insufficient permissions for health check');
+    }
+
+    try {
+      const result = this.databaseManager.getDatabaseHealthCheck();
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          } as TextContent
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Health check request failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Handle unused indexes request
+   */
+  private async handleUnusedIndexes(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    if (!permissions.includes('read')) {
+      throw new Error('Insufficient permissions for unused indexes');
+    }
+
+    try {
+      const result = this.databaseManager.getUnusedIndexes();
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          } as TextContent
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Unused indexes request failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Handle connection pool stats request
+   */
+  private async handleConnectionPoolStats(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    if (!permissions.includes('read')) {
+      throw new Error('Insufficient permissions for connection pool stats');
+    }
+
+    try {
+      const result = this.databaseManager.getConnectionPoolStats();
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          } as TextContent
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Connection pool stats request failed: ${(error as Error).message}`);
     }
   }
 

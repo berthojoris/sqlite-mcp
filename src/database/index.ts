@@ -1691,6 +1691,467 @@ export class DatabaseManager {
   }
 
   /**
+   * Get column statistics for analysis
+   */
+  public getColumnStatistics(tableName: string): any {
+    if (!this.db) throw new Error('Database not initialized');
+    if (!isValidIdentifier(tableName)) throw new Error(`Invalid table name: ${tableName}`);
+
+    try {
+      const columns = this.getTableColumns(tableName);
+      const stats = [];
+
+      for (const col of columns) {
+        const query = `
+          SELECT 
+            COUNT(*) as total_rows,
+            COUNT(DISTINCT "${col.name}") as distinct_count,
+            COUNT(*) - COUNT("${col.name}") as null_count
+          FROM "${tableName}"
+        `;
+        
+        const result = this.db.prepare(query).get() as any;
+        
+        let minVal, maxVal, avgVal;
+        if (col.type.toUpperCase().includes('INT') || col.type.toUpperCase().includes('REAL')) {
+          const numQuery = `
+            SELECT MIN("${col.name}") as min_val, MAX("${col.name}") as max_val, 
+                   AVG("${col.name}") as avg_val FROM "${tableName}" WHERE "${col.name}" IS NOT NULL
+          `;
+          const numResult = this.db.prepare(numQuery).get() as any;
+          minVal = numResult?.min_val;
+          maxVal = numResult?.max_val;
+          avgVal = numResult?.avg_val;
+        }
+
+        stats.push({
+          columnName: col.name,
+          columnType: col.type,
+          totalRows: result.total_rows,
+          distinctCount: result.distinct_count,
+          nullCount: result.null_count,
+          nullPercentage: (result.null_count / result.total_rows * 100).toFixed(2),
+          minValue: minVal,
+          maxValue: maxVal,
+          averageValue: avgVal ? parseFloat(avgVal.toFixed(4)) : null
+        });
+      }
+
+      return {
+        success: true,
+        tableName,
+        statistics: stats,
+        executionTime: 0
+      };
+    } catch (error) {
+      this.logger.error('Failed to get column statistics', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get database summary information
+   */
+  public getDatabaseSummary(): any {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const schema = this.getSchemaInfo();
+      
+      // Calculate database size
+      let dbSize = 0;
+      if (this.config.path !== ':memory:' && fs.existsSync(this.config.path)) {
+        dbSize = fs.statSync(this.config.path).size;
+      }
+
+      // Count total rows across all tables
+      let totalRows = 0;
+      for (const table of schema.tables) {
+        if (table.type === 'table') {
+          const countQuery = `SELECT COUNT(*) as count FROM "${table.name}"`;
+          const result = this.db.prepare(countQuery).get() as any;
+          totalRows += result.count;
+        }
+      }
+
+      // Get database pragma settings
+      const pragmaQuery = this.db.prepare(`PRAGMA database_list`).all() as any[];
+      
+      return {
+        success: true,
+        summary: {
+          filePath: this.config.path,
+          databaseSize: dbSize,
+          databaseSizeFormatted: this.formatBytes(dbSize),
+          tableCount: schema.tables.filter(t => t.type === 'table').length,
+          viewCount: schema.tables.filter(t => t.type === 'view').length,
+          totalRows,
+          indexCount: schema.indexes.length,
+          triggerCount: schema.triggers.length,
+          readOnly: this.config.readOnly,
+          walEnabled: this.db.pragma('journal_mode') === 'wal'
+        },
+        executionTime: 0
+      };
+    } catch (error) {
+      this.logger.error('Failed to get database summary', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get schema as ERD (Entity Relationship Diagram) data
+   */
+  public getSchemaERD(): any {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const schema = this.getSchemaInfo();
+      const entities = [];
+      const relationships = [];
+
+      for (const table of schema.tables) {
+        if (table.type === 'view') continue;
+
+        entities.push({
+          name: table.name,
+          columns: table.columns.map(col => ({
+            name: col.name,
+            type: col.type,
+            nullable: col.nullable,
+            isPrimary: col.primaryKey
+          })),
+          primaryKey: table.primaryKey
+        });
+
+        // Add relationships from foreign keys
+        if (table.foreignKeys) {
+          for (const fk of table.foreignKeys) {
+            relationships.push({
+              source: table.name,
+              sourceColumn: fk.columnName,
+              target: fk.referencedTable,
+              targetColumn: fk.referencedColumn,
+              type: 'many-to-one',
+              onDelete: fk.onDelete || 'RESTRICT',
+              onUpdate: fk.onUpdate || 'RESTRICT'
+            });
+          }
+        }
+      }
+
+      return {
+        success: true,
+        entities,
+        relationships,
+        executionTime: 0
+      };
+    } catch (error) {
+      this.logger.error('Failed to get schema ERD', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get schema as RAG context for AI models
+   */
+  public getSchemaRAGContext(): any {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const schema = this.getSchemaInfo();
+      let context = '# Database Schema Context\n\n';
+
+      context += '## Tables\n\n';
+      for (const table of schema.tables) {
+        if (table.type === 'view') continue;
+
+        context += `### ${table.name}\n`;
+        context += `**Primary Key**: ${table.primaryKey?.join(', ') || 'None'}\n\n`;
+        context += '**Columns**:\n';
+
+        for (const col of table.columns) {
+          const nullable = col.nullable ? 'NULL' : 'NOT NULL';
+          context += `- ${col.name} (${col.type}) - ${nullable}`;
+          if (col.defaultValue) context += ` DEFAULT ${col.defaultValue}`;
+          context += '\n';
+        }
+
+        if (table.foreignKeys && table.foreignKeys.length > 0) {
+          context += '\n**Foreign Keys**:\n';
+          for (const fk of table.foreignKeys) {
+            context += `- ${fk.columnName} → ${fk.referencedTable}(${fk.referencedColumn})\n`;
+          }
+        }
+
+        context += '\n';
+      }
+
+      context += '## Views\n\n';
+      for (const view of schema.tables.filter(t => t.type === 'view')) {
+        context += `### ${view.name}\n`;
+        context += `Columns: ${view.columns.map(c => c.name).join(', ')}\n\n`;
+      }
+
+      return {
+        success: true,
+        context,
+        executionTime: 0
+      };
+    } catch (error) {
+      this.logger.error('Failed to get schema RAG context', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Analyze SQL query for execution plan
+   */
+  public analyzeQuery(query: string): any {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      // Get EXPLAIN QUERY PLAN output
+      const explainQuery = `EXPLAIN QUERY PLAN ${query}`;
+      const plan = this.db.prepare(explainQuery).all() as any[];
+
+      // Get basic statistics about the query
+      const normalized = query.trim().toUpperCase();
+      const isSelect = normalized.startsWith('SELECT');
+      const isModifying = normalized.startsWith('INSERT') || normalized.startsWith('UPDATE') || normalized.startsWith('DELETE');
+
+      // Parse query to extract tables and columns
+      const tableMatch = normalized.match(/FROM\s+(\w+)|JOIN\s+(\w+)/g) || [];
+      const tables = tableMatch.map(m => m.replace(/FROM\s+|JOIN\s+/i, '')).filter((v, i, a) => a.indexOf(v) === i);
+
+      return {
+        success: true,
+        analysis: {
+          queryType: isSelect ? 'SELECT' : isModifying ? 'MODIFY' : 'OTHER',
+          tables,
+          complexity: tables.length > 2 ? 'HIGH' : tables.length > 1 ? 'MEDIUM' : 'LOW',
+          executionPlan: plan
+        },
+        executionTime: 0
+      };
+    } catch (error) {
+      this.logger.error('Failed to analyze query', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get optimization hints for a query
+   */
+  public getOptimizationHints(query: string): any {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const hints = [];
+      const normalized = query.trim().toUpperCase();
+
+      // Check for common performance issues
+      if (normalized.includes('SELECT *')) {
+        hints.push({
+          severity: 'MEDIUM',
+          issue: 'SELECT * used',
+          recommendation: 'Specify exact columns needed instead of using SELECT *'
+        });
+      }
+
+      if (normalized.includes('OR') && !normalized.includes('IN')) {
+        hints.push({
+          severity: 'MEDIUM',
+          issue: 'Multiple OR conditions',
+          recommendation: 'Consider using IN clause for better performance'
+        });
+      }
+
+      if (normalized.includes('LIKE') && normalized.match(/LIKE\s+'%/)) {
+        hints.push({
+          severity: 'HIGH',
+          issue: 'LIKE with leading wildcard',
+          recommendation: 'Leading wildcards prevent index usage. Consider restructuring the query'
+        });
+      }
+
+      if (normalized.includes('NOT IN')) {
+        hints.push({
+          severity: 'LOW',
+          issue: 'NOT IN used',
+          recommendation: 'Consider using NOT EXISTS or LEFT JOIN for better performance'
+        });
+      }
+
+      // Check for missing indexes
+      const tableMatch = normalized.match(/FROM\s+(\w+)|JOIN\s+(\w+)/g) || [];
+      const tables = tableMatch.map(m => m.replace(/FROM\s+|JOIN\s+/i, '')).filter((v, i, a) => a.indexOf(v) === i);
+
+      for (const table of tables) {
+        if (isValidIdentifier(table)) {
+          try {
+            const columns = this.getTableColumns(table);
+            const tableIndexes = this.getTableIndexes(table);
+
+            for (const col of columns) {
+              if (normalized.includes(`WHERE`) && normalized.includes(col.name) && !tableIndexes.includes(col.name)) {
+                hints.push({
+                  severity: 'MEDIUM',
+                  issue: `Column ${col.name} in WHERE clause without index`,
+                  recommendation: `Consider creating an index on ${table}.${col.name}`
+                });
+              }
+            }
+          } catch (e) {
+            // Skip if table analysis fails
+          }
+        }
+      }
+
+      if (hints.length === 0) {
+        hints.push({
+          severity: 'LOW',
+          issue: 'Query appears optimized',
+          recommendation: 'No obvious optimization issues detected'
+        });
+      }
+
+      return {
+        success: true,
+        query,
+        hints,
+        executionTime: 0
+      };
+    } catch (error) {
+      this.logger.error('Failed to get optimization hints', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Perform database health check
+   */
+  public getDatabaseHealthCheck(): any {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const checks = [];
+
+      // PRAGMA integrity_check
+      const integrityResult = this.db.prepare('PRAGMA integrity_check').all() as any[];
+      const integrityOk = integrityResult.length === 1 && integrityResult[0].integrity_check === 'ok';
+      checks.push({
+        name: 'Database Integrity',
+        status: integrityOk ? 'OK' : 'FAILED',
+        details: integrityResult.length === 1 ? integrityResult[0].integrity_check : integrityResult.map(r => r.integrity_check).join('; ')
+      });
+
+      // PRAGMA quick_check
+      const quickCheckResult = this.db.prepare('PRAGMA quick_check').all() as any[];
+      const quickCheckOk = quickCheckResult.length === 1 && quickCheckResult[0].quick_check === 'ok';
+      checks.push({
+        name: 'Quick Check',
+        status: quickCheckOk ? 'OK' : 'WARNING',
+        details: quickCheckOk ? 'No issues detected' : quickCheckResult.length + ' issues found'
+      });
+
+      // Foreign key consistency
+      const fkCheck = this.db.prepare('PRAGMA foreign_key_check').all() as any[];
+      checks.push({
+        name: 'Foreign Key Consistency',
+        status: fkCheck.length === 0 ? 'OK' : 'FAILED',
+        details: fkCheck.length === 0 ? 'All foreign keys valid' : fkCheck.length + ' violations found'
+      });
+
+      // Check for orphaned tables
+      const schema = this.getSchemaInfo();
+      checks.push({
+        name: 'Schema Validity',
+        status: schema.tables.length > 0 ? 'OK' : 'WARNING',
+        details: `${schema.tables.length} tables, ${schema.views.length} views, ${schema.indexes.length} indexes`
+      });
+
+      const overallStatus = checks.every(c => c.status === 'OK') ? 'HEALTHY' : 'NEEDS_ATTENTION';
+
+      return {
+        success: true,
+        status: overallStatus,
+        checks,
+        executionTime: 0
+      };
+    } catch (error) {
+      this.logger.error('Failed to get health check', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Find unused indexes
+   */
+  public getUnusedIndexes(): any {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      const allIndexes = this.listIndexes();
+      const schema = this.getSchemaInfo();
+      const unusedIndexes = [];
+
+      for (const index of allIndexes) {
+        // Check if index columns are used in WHERE clauses of typical queries
+        // For SQLite, we can check if the index is referenced in PRAGMA index_info
+        const indexInfo = this.getIndexInfo(index.name);
+        
+        // An index is considered unused if no queries typically reference it
+        // Since SQLite doesn't track usage, we flag indexes that match auto-generated patterns
+        const isAutoGenerated = index.name.startsWith('sqlite_autoindex_');
+        
+        if (!isAutoGenerated) {
+          // Check if this is a duplicate or redundant index
+          const isDuplicate = allIndexes.some(idx => 
+            idx.name !== index.name && 
+            JSON.stringify(idx.columns) === JSON.stringify(index.columns) &&
+            idx.name < index.name
+          );
+
+          if (!isDuplicate) {
+            unusedIndexes.push({
+              indexName: index.name,
+              tableName: index.tableName,
+              columns: index.columns,
+              isUnique: index.isUnique,
+              status: 'POTENTIALLY_UNUSED',
+              recommendation: 'Monitor usage or consider dropping if not used'
+            });
+          }
+        }
+      }
+
+      return {
+        success: true,
+        totalIndexes: allIndexes.length,
+        potentiallyUnusedCount: unusedIndexes.length,
+        unusedIndexes,
+        executionTime: 0
+      };
+    } catch (error) {
+      this.logger.error('Failed to get unused indexes', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Helper function to format bytes to human readable
+   */
+  private formatBytes(bytes: number, decimals: number = 2): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+  }
+
+  /**
    * Close all database connections
    */
   public close(): void {

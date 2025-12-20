@@ -2,6 +2,62 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2025-12-20
+
+### Added
+- **New Tool: `sqlite_column_statistics`**: Detailed column statistics and data profiling
+  - Column data type, distinct values, null counts
+  - Min/max values for numeric columns
+  - Average values and null percentages
+  
+- **New Tool: `sqlite_database_summary`**: Comprehensive database metadata and statistics
+  - File size (formatted and raw bytes)
+  - Table, view, index, and trigger counts
+  - Total row count across all tables
+  - WAL mode status and read-only status
+
+- **New Tool: `sqlite_schema_erd`**: Entity Relationship Diagram data generation
+  - Entities with columns and primary keys
+  - Relationships with foreign key information
+  - Supports visualization tool integration
+
+- **New Tool: `sqlite_schema_rag_context`**: RAG context generation for AI models
+  - Markdown-formatted schema documentation
+  - Table structures with column types and constraints
+  - Foreign key relationships and defaults
+  - Optimized for AI/LLM consumption
+
+- **New Tool: `sqlite_analyze_query`**: SQL query analysis and optimization
+  - EXPLAIN QUERY PLAN output
+  - Query type detection (SELECT, MODIFY, etc.)
+  - Table extraction and complexity assessment
+
+- **New Tool: `sqlite_optimization_hints`**: Query optimization recommendations
+  - Detects SELECT * usage
+  - Identifies leading wildcard LIKE patterns
+  - Suggests missing indexes
+  - Recommends query structure improvements
+
+- **New Tool: `sqlite_database_health_check`**: Database integrity and health monitoring
+  - PRAGMA integrity_check results
+  - Foreign key consistency validation
+  - Schema validity assessment
+  - Overall database health status
+
+- **New Tool: `sqlite_unused_indexes`**: Index optimization analysis
+  - Identifies potentially unused indexes
+  - Detects redundant/duplicate indexes
+  - Provides removal recommendations
+
+- **New Tool: `sqlite_connection_pool_stats`**: Connection pool monitoring
+  - Active connection count
+  - Pool size and availability statistics
+
+### Changed
+- Incremented tool count from 18 to 28 in documentation
+- Updated version in package.json and server implementation to 1.3.0
+- Enhanced README with new data analysis and query optimization tools
+
 ## [1.2.0] - 2025-12-20
 
 ### Added

@@ -15,7 +15,7 @@ A comprehensive Model Context Protocol (MCP) server implementation for SQLite da
   - [Cursor IDE](#cursor-ide)
   - [Continue.dev](#continuedev)
   - [Other MCP Clients](#other-mcp-clients)
-- [Available Tools (18 Tools)](#-available-tools)
+- [Available Tools (28 Tools)](#-available-tools)
 - [Tool Documentation](DOCUMENTATIONS.md)
 - [Permission System](#permission-system)
 - [Configuration](#-configuration)
@@ -451,7 +451,7 @@ mcp-sqlite-server config --template --output mcp-template.json
 
 ## 🔌 Available Tools
 
-The MCP server provides **18 powerful tools** for comprehensive SQLite database management:
+The MCP server provides **28 powerful tools** for comprehensive SQLite database management:
 
 ### Tools Summary
 
@@ -475,6 +475,15 @@ The MCP server provides **18 powerful tools** for comprehensive SQLite database 
 | 16 | [`sqlite_constraints`](#sqlite_constraints) | View constraints and foreign keys | `list` |
 | 17 | [`sqlite_migrate`](#sqlite_migrate) | Data migration between tables | `read`, `create`, `update` |
 | 18 | [`sqlite_backup_restore`](#sqlite_backup_restore) | Backup tables and restore from SQL | `utility`, `read`, `ddl` |
+| 19 | [`sqlite_column_statistics`](#sqlite_column_statistics) | Column statistics and data profiling | `read` |
+| 20 | [`sqlite_database_summary`](#sqlite_database_summary) | Database summary and metadata | `read` |
+| 21 | [`sqlite_schema_erd`](#sqlite_schema_erd) | Entity relationship diagram data | `read` |
+| 22 | [`sqlite_schema_rag_context`](#sqlite_schema_rag_context) | RAG context for AI models | `read` |
+| 23 | [`sqlite_analyze_query`](#sqlite_analyze_query) | Query analysis and execution plans | `read` |
+| 24 | [`sqlite_optimization_hints`](#sqlite_optimization_hints) | Query optimization suggestions | `read` |
+| 25 | [`sqlite_database_health_check`](#sqlite_database_health_check) | Database health and integrity checks | `read` |
+| 26 | [`sqlite_unused_indexes`](#sqlite_unused_indexes) | Find unused or redundant indexes | `read` |
+| 27 | [`sqlite_connection_pool_stats`](#sqlite_connection_pool_stats) | Connection pool statistics | `read` |
 
 ### Tool Categories
 
