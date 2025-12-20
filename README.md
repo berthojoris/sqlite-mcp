@@ -16,6 +16,7 @@ A comprehensive Model Context Protocol (MCP) server implementation for SQLite da
   - [Continue.dev](#continuedev)
   - [Other MCP Clients](#other-mcp-clients)
 - [Available Tools (12 Tools)](#-available-tools)
+- [Tool Documentation](DOCUMENTATIONS.md)
 - [Permission System](#permission-system)
 - [Configuration](#-configuration)
 - [CLI Usage](#️-cli-usage)
@@ -105,18 +106,10 @@ npm install @berthojoris/mcp-sqlite-server
 
 ## 🔗 Integration Guide
 
-This section provides detailed instructions for integrating SQLite MCP Server with various MCP-compatible clients.
+### Standard MCP Configuration
 
-### Claude Desktop
+Add this configuration to your MCP client's config file:
 
-Claude Desktop is the official Anthropic client with native MCP support.
-
-**Configuration File Location:**
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-- **Linux**: `~/.config/Claude/claude_desktop_config.json`
-
-**Configuration:**
 ```json
 {
   "mcpServers": {
@@ -125,7 +118,7 @@ Claude Desktop is the official Anthropic client with native MCP support.
       "args": [
         "-y",
         "@berthojoris/mcp-sqlite-server",
-        "sqlite:////Users/yourname/databases/myapp.sqlite",
+        "sqlite:////path/to/database.sqlite",
         "list,read,create,update,delete,utility"
       ]
     }
@@ -133,175 +126,71 @@ Claude Desktop is the official Anthropic client with native MCP support.
 }
 ```
 
-**Windows Example:**
-```json
-{
-  "mcpServers": {
-    "sqlite": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@berthojoris/mcp-sqlite-server",
-        "sqlite:///C:/Users/yourname/databases/myapp.sqlite",
-        "list,read,create,update,delete,utility"
-      ]
-    }
-  }
-}
+**Arguments Explained:**
+| # | Argument | Description |
+|---|----------|-------------|
+| 1 | `-y` | Auto-confirm npx installation |
+| 2 | `@berthojoris/mcp-sqlite-server` | Package name |
+| 3 | `sqlite:////path/to/database.sqlite` | Database connection string |
+| 4 | `list,read,create,update,delete,utility` | Comma-separated permissions |
+
+### Config File Locations by Client
+
+| Client | Config File Location |
+|--------|---------------------|
+| **Claude Desktop (macOS)** | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| **Claude Desktop (Windows)** | `%APPDATA%\Claude\claude_desktop_config.json` |
+| **Claude Desktop (Linux)** | `~/.config/Claude/claude_desktop_config.json` |
+| **Cursor IDE (macOS/Linux)** | `~/.cursor/mcp.json` |
+| **Cursor IDE (Windows)** | `%USERPROFILE%\.cursor\mcp.json` |
+| **Windsurf IDE** | `~/.windsurf/mcp.json` |
+| **Cline (VS Code)** | VS Code `settings.json` under `cline.mcpServers` |
+
+### Platform-Specific Path Examples
+
+```bash
+# macOS/Linux
+"sqlite:////Users/yourname/databases/app.sqlite"
+"sqlite:////home/user/projects/data.sqlite"
+
+# Windows
+"sqlite:///C:/Users/yourname/databases/app.sqlite"
+
+# Relative path (from working directory)
+"sqlite://./data/app.sqlite"
+
+# In-memory database
+"sqlite://:memory:"
 ```
 
-**After configuration:** Restart Claude Desktop to load the MCP server.
+### Special Configurations
 
----
-
-### Cursor IDE
-
-Cursor IDE supports MCP servers for enhanced AI-assisted development.
-
-**Configuration File Location:**
-- **macOS/Linux**: `~/.cursor/mcp.json`
-- **Windows**: `%USERPROFILE%\.cursor\mcp.json`
-
-**Configuration:**
-```json
-{
-  "mcpServers": {
-    "sqlite": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@berthojoris/mcp-sqlite-server",
-        "sqlite:////path/to/your/project/database.sqlite",
-        "list,read,create,update,delete,ddl,transaction,utility"
-      ]
-    }
-  }
-}
-```
-
-**Project-Specific Configuration (`.cursor/mcp.json` in project root):**
-```json
-{
-  "mcpServers": {
-    "project-db": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@berthojoris/mcp-sqlite-server",
-        "sqlite://./data/app.sqlite",
-        "list,read,create,update,delete"
-      ]
-    }
-  }
-}
-```
-
----
-
-### Continue.dev
-
-Continue.dev is an open-source AI code assistant that supports MCP.
-
-**Configuration File:** `~/.continue/config.json`
-
+**Continue.dev** uses array format (`~/.continue/config.json`):
 ```json
 {
   "mcpServers": [
     {
       "name": "sqlite",
       "command": "npx",
-      "args": [
-        "-y",
-        "@berthojoris/mcp-sqlite-server",
-        "sqlite:////path/to/database.sqlite",
-        "list,read,create,update,delete"
-      ]
+      "args": ["-y", "@berthojoris/mcp-sqlite-server", "sqlite:////path/to/db.sqlite", "list,read,create,update,delete"]
     }
   ]
 }
 ```
 
----
-
-### Cline (VS Code Extension)
-
-Cline is a VS Code extension that supports MCP servers.
-
-**Configuration:** Add to VS Code settings (`settings.json`):
-
+**Cline (VS Code)** uses nested key in `settings.json`:
 ```json
 {
   "cline.mcpServers": {
     "sqlite": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@berthojoris/mcp-sqlite-server",
-        "sqlite:////path/to/database.sqlite",
-        "list,read,create,update,delete,utility"
-      ]
+      "args": ["-y", "@berthojoris/mcp-sqlite-server", "sqlite:////path/to/db.sqlite", "list,read,create,update,delete"]
     }
   }
 }
 ```
 
----
-
-### Windsurf IDE
-
-Windsurf IDE by Codeium supports MCP integration.
-
-**Configuration File:** `~/.windsurf/mcp.json`
-
-```json
-{
-  "mcpServers": {
-    "sqlite": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@berthojoris/mcp-sqlite-server",
-        "sqlite:////path/to/database.sqlite",
-        "list,read,create,update,delete,ddl"
-      ]
-    }
-  }
-}
-```
-
----
-
-### Other MCP Clients
-
-For any MCP-compatible client, use the following general configuration pattern:
-
-```json
-{
-  "mcpServers": {
-    "sqlite": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@berthojoris/mcp-sqlite-server",
-        "<connection-string>",
-        "<permissions>"
-      ]
-    }
-  }
-}
-```
-
-**Arguments:**
-1. `-y` - Auto-confirm npx installation
-2. `@berthojoris/mcp-sqlite-server` - Package name
-3. `<connection-string>` - SQLite database path (see Connection String Formats below)
-4. `<permissions>` - Comma-separated list of permissions
-
----
-
-### Multiple Database Configuration
-
-You can configure multiple SQLite databases:
+### Multiple Databases
 
 ```json
 {
@@ -313,35 +202,12 @@ You can configure multiple SQLite databases:
     "analytics-db": {
       "command": "npx",
       "args": ["-y", "@berthojoris/mcp-sqlite-server", "sqlite:////path/to/analytics.sqlite", "list,read"]
-    },
-    "logs-db": {
-      "command": "npx",
-      "args": ["-y", "@berthojoris/mcp-sqlite-server", "sqlite:////path/to/logs.sqlite", "list,read,utility"]
     }
   }
 }
 ```
 
 ## 🔧 Configuration
-
-### MCP Client Configuration
-Add to your MCP client configuration:
-
-```json
-{
-  "mcpServers": {
-    "sqlite": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@berthojoris/mcp-sqlite-server",
-        "sqlite:////absolute/path/to/your/database.sqlite",
-        "list,read,create,update,delete,utility"
-      ]
-    }
-  }
-}
-```
 
 ### Connection String Formats
 The server supports multiple SQLite connection string formats:
@@ -630,281 +496,7 @@ The MCP server provides **12 powerful tools** for comprehensive SQLite database 
 - `sqlite_transaction` - Atomic multi-query execution
 - `sqlite_backup` - Database backup utility
 
----
-
-### Detailed Tool Documentation
-
-### `sqlite_query`
-Execute SELECT queries with full result sets.
-
-**Parameters:**
-- `query` (string): SQL SELECT statement
-- `parameters` (array, optional): Query parameters for prepared statements
-
-**Required Permissions:** `read`
-
-**Example:**
-```sql
-SELECT * FROM users WHERE age > ? AND city = ?
-Parameters: [25, "New York"]
-```
-
-### `sqlite_insert`
-Insert new records into tables.
-
-**Parameters:**
-- `query` (string): SQL INSERT statement
-- `parameters` (array, optional): Values to insert
-
-**Required Permissions:** `create`
-
-**Example:**
-```sql
-INSERT INTO users (name, email, age) VALUES (?, ?, ?)
-Parameters: ["John Doe", "john@example.com", 30]
-```
-
-### `sqlite_update`
-Update existing records.
-
-**Parameters:**
-- `query` (string): SQL UPDATE statement
-- `parameters` (array, optional): Update values
-
-**Required Permissions:** `update`
-
-**Example:**
-```sql
-UPDATE users SET email = ? WHERE id = ?
-Parameters: ["newemail@example.com", 123]
-```
-
-### `sqlite_delete`
-Delete records from tables.
-
-**Parameters:**
-- `query` (string): SQL DELETE statement
-- `parameters` (array, optional): Condition parameters
-
-**Required Permissions:** `delete`
-
-**Example:**
-```sql
-DELETE FROM users WHERE last_login < ?
-Parameters: ["2023-01-01"]
-```
-
-### `sqlite_schema`
-Get comprehensive database schema information.
-
-**Parameters:**
-- `table` (string, optional): Specific table name
-
-**Required Permissions:** `list`
-
-**Returns:** Complete schema information including tables, columns, indexes, views, triggers, and foreign keys.
-
-### `sqlite_tables`
-List all tables in the database.
-
-**Required Permissions:** `list`
-
-**Returns:** Array of table names with basic metadata.
-
-### `sqlite_transaction`
-Execute multiple queries within a transaction.
-
-**Parameters:**
-- `queries` (array): Array of query objects with `query` and optional `parameters`
-
-**Required Permissions:** `transaction` + permissions for individual operations
-
-**Example:**
-```json
-{
-  "queries": [
-    {
-      "query": "INSERT INTO accounts (name, balance) VALUES (?, ?)",
-      "parameters": ["Alice", 1000]
-    },
-    {
-      "query": "INSERT INTO accounts (name, balance) VALUES (?, ?)", 
-      "parameters": ["Bob", 500]
-    }
-  ]
-}
-```
-
-### `sqlite_backup`
-Create a backup of the database.
-
-**Parameters:**
-- `backupPath` (string): Path for the backup file
-
-**Required Permissions:** `utility`
-
-### `sqlite_bulk_insert`
-Perform bulk insert operations with relational data support and progress tracking.
-
-**Parameters:**
-- `mainTable` (string): Main table name to insert into
-- `records` (array): Array of records to insert
-- `relatedData` (object, optional): Related table data with foreign key mappings
-- `options` (object, optional): Bulk insert options
-  - `batchSize` (number): Batch size for processing (default: 1000)
-  - `continueOnError` (boolean): Continue processing on errors (default: false)
-  - `validateForeignKeys` (boolean): Validate foreign key constraints (default: true)
-  - `insertRelatedData` (boolean): Insert related table data first (default: true)
-
-**Required Permissions:** `create`
-
-**Example:**
-```json
-{
-  "mainTable": "posts",
-  "records": [
-    {"title": "Post 1", "content": "Content 1", "user_id": 1},
-    {"title": "Post 2", "content": "Content 2", "user_id": 2}
-  ],
-  "relatedData": {
-    "users": [
-      {"id": 1, "name": "John", "email": "john@example.com"},
-      {"id": 2, "name": "Jane", "email": "jane@example.com"}
-    ]
-  },
-  "options": {
-    "batchSize": 500,
-    "continueOnError": true,
-    "validateForeignKeys": true
-  }
-}
-```
-
-### `sqlite_bulk_update`
-Perform bulk update operations with progress tracking.
-
-**Parameters:**
-- `table` (string): Table name to update
-- `updates` (array): Array of update operations with `data` and `where` conditions
-- `options` (object, optional): Bulk update options
-  - `batchSize` (number): Batch size for processing (default: 1000)
-  - `continueOnError` (boolean): Continue processing on errors (default: false)
-  - `validateForeignKeys` (boolean): Validate foreign key constraints (default: true)
-
-**Required Permissions:** `update`
-
-**Example:**
-```json
-{
-  "table": "users",
-  "updates": [
-    {
-      "data": {"name": "John Updated", "email": "john.new@example.com"},
-      "where": {"id": 1}
-    },
-    {
-      "data": {"status": "active"},
-      "where": {"last_login": {"$gt": "2024-01-01"}}
-    }
-  ],
-  "options": {
-    "batchSize": 100,
-    "continueOnError": false
-  }
-}
-```
-
-### `sqlite_bulk_delete`
-Perform bulk delete operations with cascading support and progress tracking.
-
-**Parameters:**
-- `table` (string): Table name to delete from
-- `conditions` (array): Array of WHERE conditions for deletion
-- `options` (object, optional): Bulk delete options
-  - `batchSize` (number): Batch size for processing (default: 1000)
-  - `continueOnError` (boolean): Continue processing on errors (default: false)
-  - `cascadeDelete` (boolean): Enable cascade delete for related records (default: true)
-
-**Required Permissions:** `delete`
-
-**Example:**
-```json
-{
-  "table": "posts",
-  "conditions": [
-    {"created_at": {"$lt": "2023-01-01"}},
-    {"status": "deleted"},
-    {"user_id": {"$in": [1, 2, 3]}}
-  ],
-  "options": {
-    "batchSize": 50,
-    "cascadeDelete": true
-  }
-}
-```
-
-### `sqlite_ddl`
-Execute DDL (Data Definition Language) operations for schema management.
-
-**Parameters:**
-- `operation` (string): DDL operation - `create_table`, `drop_table`, `alter_table`, `create_index`, `drop_index`
-- `table` (string): Table name
-- `columns` (array, optional): Column definitions for `create_table`
-  - `name` (string): Column name
-  - `type` (string): Data type (TEXT, INTEGER, REAL, BLOB, etc.)
-  - `primaryKey` (boolean): Is primary key
-  - `autoIncrement` (boolean): Auto increment (only for INTEGER PRIMARY KEY)
-  - `notNull` (boolean): NOT NULL constraint
-  - `unique` (boolean): UNIQUE constraint
-  - `defaultValue` (string): Default value
-  - `foreignKey` (object): Foreign key reference with `table`, `column`, `onDelete`, `onUpdate`
-- `alterAction` (object, optional): For `alter_table` - `action` (`add_column`, `rename_table`, `rename_column`), `column`, `newName`, `oldColumnName`
-- `index` (object, optional): For index operations - `name`, `columns`, `unique`
-- `ifNotExists` (boolean): Add IF NOT EXISTS clause
-- `ifExists` (boolean): Add IF EXISTS clause for drop operations
-
-**Required Permissions:** `ddl`
-
-**Example - Create Table:**
-```json
-{
-  "operation": "create_table",
-  "table": "users",
-  "columns": [
-    {"name": "id", "type": "INTEGER", "primaryKey": true, "autoIncrement": true},
-    {"name": "name", "type": "TEXT", "notNull": true},
-    {"name": "email", "type": "TEXT", "unique": true},
-    {"name": "created_at", "type": "TEXT", "defaultValue": "CURRENT_TIMESTAMP"}
-  ],
-  "ifNotExists": true
-}
-```
-
-**Example - Create Index:**
-```json
-{
-  "operation": "create_index",
-  "table": "users",
-  "index": {
-    "name": "idx_users_email",
-    "columns": ["email"],
-    "unique": true
-  },
-  "ifNotExists": true
-}
-```
-
-**Example - Alter Table:**
-```json
-{
-  "operation": "alter_table",
-  "table": "users",
-  "alterAction": {
-    "action": "add_column",
-    "column": {"name": "phone", "type": "TEXT"}
-  }
-}
-```
+> 📖 **Full Documentation:** See [DOCUMENTATIONS.md](DOCUMENTATIONS.md) for detailed parameters, examples, and response formats for each tool.
 
 ## 🔒 Security Guidelines
 
@@ -1039,4 +631,4 @@ For issues, questions, or contributions:
 
 ---
 
-**Last Updated**: 2024-12-20 17:00:00
+**Last Updated**: 2024-12-20 17:30:00
