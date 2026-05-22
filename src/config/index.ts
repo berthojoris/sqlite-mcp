@@ -77,7 +77,7 @@ export class ConfigManager {
   public parsePermissions(permissionString: string): PermissionType[] {
     const validPermissions: PermissionType[] = [
       'list', 'read', 'create', 'update', 'delete', 
-      'execute', 'ddl', 'transaction', 'utility'
+      'execute', 'ddl', 'procedure', 'transaction', 'utility'
     ];
 
     const permissions = permissionString

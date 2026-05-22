@@ -18,6 +18,7 @@ import { ConfigManager } from '../config';
 import { Logger } from 'winston';
 import { PermissionType, QueryResult, SchemaInfo, MCPToolDefinition } from '../types';
 import { safeIdentifier } from '../utils';
+import { PACKAGE_VERSION } from '../version';
 
 export class MCPSQLiteServer {
   private server: Server;
@@ -42,14 +43,12 @@ export class MCPSQLiteServer {
     this.server = new Server(
       {
         name: 'sqlite-mcp-server',
-        version: '1.3.0',
+        version: PACKAGE_VERSION,
         description: 'SQLite database server implementing the Model Context Protocol'
       },
       {
         capabilities: {
-          tools: {},
-          resources: {},
-          prompts: {}
+          tools: {}
         }
       }
     );
@@ -62,9 +61,12 @@ export class MCPSQLiteServer {
    */
   private setupHandlers(): void {
     // List available tools
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+    this.server.setRequestHandler(ListToolsRequestSchema, async (request) => {
+      const clientId = this.extractClientId(request);
+      const clientPermissions = this.clientPermissions.get(clientId) || this.clientPermissions.get('default') || [];
+
       return {
-        tools: this.getAvailableTools()
+        tools: this.getAvailableTools(clientPermissions)
       };
     });
 
@@ -112,7 +114,7 @@ export class MCPSQLiteServer {
   /**
    * Get available tools based on permissions
    */
-  private getAvailableTools(): Tool[] {
+  private getAvailableTools(clientPermissions: PermissionType[] = []): Tool[] {
     const tools: MCPToolDefinition[] = [
       {
         name: 'sqlite_query',
@@ -127,7 +129,7 @@ export class MCPSQLiteServer {
             parameters: {
               type: 'array',
               description: 'Values for query placeholders in order. Example: [25, "active"] for the query above',
-              items: { type: 'string' }
+              items: { type: ['string', 'number', 'boolean', 'null'] }
             }
           },
           required: ['query']
@@ -685,15 +687,187 @@ export class MCPSQLiteServer {
           properties: {}
         },
         requiredPermissions: ['read']
+      },
+      {
+        name: 'sqlite_upsert',
+        description: 'Insert or update one row using SQLite ON CONFLICT. Use this when a table has a UNIQUE or PRIMARY KEY constraint and the desired behavior is "create if missing, update if existing".',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            table: { type: 'string', description: 'Target table name. Example: "users"' },
+            data: { type: 'object', description: 'Column-value pairs to insert and optionally update. Conflict columns must be included.' },
+            conflictColumns: {
+              type: 'array',
+              description: 'Columns that define the ON CONFLICT target. Example: ["email"] or ["tenant_id", "external_id"]',
+              items: { type: 'string' }
+            },
+            updateColumns: {
+              type: 'array',
+              description: 'Optional subset of columns to update on conflict. Defaults to all non-conflict columns.',
+              items: { type: 'string' }
+            }
+          },
+          required: ['table', 'data', 'conflictColumns']
+        },
+        requiredPermissions: ['create', 'update']
+      },
+      {
+        name: 'sqlite_pragma',
+        description: 'Safely list, read, or update allowlisted SQLite PRAGMA settings such as foreign_keys, journal_mode, user_version, cache_size, synchronous, trusted_schema, and wal_autocheckpoint.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            operation: {
+              type: 'string',
+              enum: ['list', 'get', 'set'],
+              description: 'Operation to perform. Use list to discover safe PRAGMAs, get to read one, or set to update one.'
+            },
+            pragma: { type: 'string', description: 'PRAGMA name for get/set. Example: "foreign_keys", "journal_mode", "user_version".' },
+            value: { description: 'Value for set operations. Supports string, number, or boolean values.' }
+          },
+          required: ['operation']
+        },
+        requiredPermissions: ['utility']
+      },
+      {
+        name: 'sqlite_integrity_check',
+        description: 'Run PRAGMA quick_check or integrity_check to verify SQLite database structure and page integrity. Returns issue details without modifying data.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            checkType: {
+              type: 'string',
+              enum: ['quick', 'integrity'],
+              description: 'quick is faster; integrity performs deeper validation.'
+            },
+            maxErrors: {
+              type: 'number',
+              description: 'Maximum number of errors SQLite should return. Range: 1-10000. Default: 100.'
+            }
+          }
+        },
+        requiredPermissions: ['utility']
+      },
+      {
+        name: 'sqlite_foreign_key_check',
+        description: 'Run PRAGMA foreign_key_check globally or for one table to find rows that violate foreign key constraints.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            table: { type: 'string', description: 'Optional table name to check. If omitted, checks the full database.' }
+          }
+        },
+        requiredPermissions: ['utility']
+      },
+      {
+        name: 'sqlite_vacuum',
+        description: 'Run SQLite VACUUM maintenance to rebuild the database file or incremental_vacuum to reclaim free pages when auto_vacuum is incremental.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            mode: {
+              type: 'string',
+              enum: ['full', 'incremental'],
+              description: 'full runs VACUUM; incremental runs PRAGMA incremental_vacuum.'
+            },
+            pages: { type: 'number', description: 'Optional page count for incremental mode.' }
+          }
+        },
+        requiredPermissions: ['utility']
+      },
+      {
+        name: 'sqlite_analyze',
+        description: 'Run SQLite maintenance commands ANALYZE, REINDEX, or PRAGMA optimize to refresh planner statistics and improve query planning.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            operation: {
+              type: 'string',
+              enum: ['analyze', 'reindex', 'optimize'],
+              description: 'Maintenance operation. analyze refreshes statistics, reindex rebuilds indexes, optimize asks SQLite to optimize opportunistically.'
+            },
+            target: { type: 'string', description: 'Optional table or index name for analyze/reindex.' }
+          }
+        },
+        requiredPermissions: ['utility']
+      },
+      {
+        name: 'sqlite_wal_checkpoint',
+        description: 'Run PRAGMA wal_checkpoint with a safe mode to flush WAL frames back into the database. Useful for WAL maintenance and backup workflows.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            mode: {
+              type: 'string',
+              enum: ['PASSIVE', 'FULL', 'RESTART', 'TRUNCATE'],
+              description: 'Checkpoint mode. PASSIVE is safest; TRUNCATE also truncates the WAL file when possible.'
+            }
+          }
+        },
+        requiredPermissions: ['utility']
+      },
+      {
+        name: 'sqlite_explain_query_plan',
+        description: 'Return EXPLAIN QUERY PLAN output for a SQL statement without executing its data-changing form. Use before optimizing joins, indexes, and filters.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'SQL statement to explain. Use ? placeholders for parameters.' },
+            parameters: {
+              type: 'array',
+              description: 'Values for query placeholders in order.',
+              items: { type: ['string', 'number', 'boolean', 'null'] }
+            },
+            includeBytecode: { type: 'boolean', description: 'When true, also includes full EXPLAIN bytecode.' }
+          },
+          required: ['query']
+        },
+        requiredPermissions: ['read']
+      },
+      {
+        name: 'sqlite_table_inspect',
+        description: 'Inspect one table using SQLite-native metadata: table_xinfo columns, indexes with index_xinfo details, foreign keys, triggers, CREATE statement, row count, and optional sample rows.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            table: { type: 'string', description: 'Table or view name to inspect.' },
+            sampleLimit: { type: 'number', description: 'Optional number of sample rows to return, capped at 100.' }
+          },
+          required: ['table']
+        },
+        requiredPermissions: ['list', 'read']
+      },
+      {
+        name: 'sqlite_audit_logs',
+        description: 'Return recent MCP audit log entries for tool calls handled by this server instance. Useful for debugging agent activity and permission failures.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            clientId: { type: 'string', description: 'Optional client ID filter.' },
+            limit: { type: 'number', description: 'Maximum entries to return, capped at 1000. Default: 100.' }
+          }
+        },
+        requiredPermissions: ['utility']
       }
     ];
 
-    // Convert to MCP Tool format
-    return tools.map(tool => ({
+    const visibleTools = clientPermissions.length === 0
+      ? tools
+      : tools.filter(tool => this.canListTool(tool, clientPermissions));
+
+    return visibleTools.map(tool => ({
       name: tool.name,
       description: tool.description,
       inputSchema: tool.inputSchema
     }));
+  }
+
+  private canListTool(tool: MCPToolDefinition, permissions: PermissionType[]): boolean {
+    if (!tool.requiredPermissions || tool.requiredPermissions.length === 0) {
+      return true;
+    }
+
+    return tool.requiredPermissions.some(permission => permissions.includes(permission));
   }
 
   /**
@@ -716,8 +890,16 @@ export class MCPSQLiteServer {
     if (clientPermissions.length === 0) {
       throw new Error(`No permissions configured for client: ${clientId}`);
     }
-    
-    switch (toolName) {
+
+    return this.withToolAudit(toolName, args, clientId, async () => {
+      const securityConfig = this.configManager.getConfig().security;
+      const rateLimit = securityConfig.rateLimitPerMinute || securityConfig.rateLimitRequests || 100;
+
+      if (!this.securityManager.checkRateLimit(clientId, rateLimit)) {
+        throw new Error(`Rate limit exceeded for client: ${clientId}`);
+      }
+
+      switch (toolName) {
       case 'sqlite_query':
         return this.handleQuery(args, clientId, clientPermissions);
       
@@ -798,9 +980,72 @@ export class MCPSQLiteServer {
       
       case 'sqlite_connection_pool_stats':
         return this.handleConnectionPoolStats(args, clientId, clientPermissions);
+
+      case 'sqlite_upsert':
+        return this.handleUpsert(args, clientId, clientPermissions);
+
+      case 'sqlite_pragma':
+        return this.handlePragma(args, clientId, clientPermissions);
+
+      case 'sqlite_integrity_check':
+        return this.handleIntegrityCheck(args, clientId, clientPermissions);
+
+      case 'sqlite_foreign_key_check':
+        return this.handleForeignKeyCheck(args, clientId, clientPermissions);
+
+      case 'sqlite_vacuum':
+        return this.handleVacuum(args, clientId, clientPermissions);
+
+      case 'sqlite_analyze':
+        return this.handleAnalyzeMaintenance(args, clientId, clientPermissions);
+
+      case 'sqlite_wal_checkpoint':
+        return this.handleWalCheckpoint(args, clientId, clientPermissions);
+
+      case 'sqlite_explain_query_plan':
+        return this.handleExplainQueryPlan(args, clientId, clientPermissions);
+
+      case 'sqlite_table_inspect':
+        return this.handleTableInspect(args, clientId, clientPermissions);
+
+      case 'sqlite_audit_logs':
+        return this.handleAuditLogs(args, clientId, clientPermissions);
       
       default:
         throw new Error(`Unknown tool: ${toolName}`);
+      }
+    });
+  }
+
+  private async withToolAudit(
+    toolName: string,
+    args: Record<string, any>,
+    clientId: string,
+    action: () => Promise<CallToolResult>
+  ): Promise<CallToolResult> {
+    const startTime = Date.now();
+
+    try {
+      const result = await action();
+      this.securityManager.logAudit({
+        clientId,
+        operationType: toolName,
+        queryHash: this.securityManager.hashQuery(JSON.stringify(args || {})),
+        resultStatus: 'success',
+        executionTimeMs: Date.now() - startTime
+      });
+      return result;
+    } catch (error) {
+      const message = (error as Error).message;
+      this.securityManager.logAudit({
+        clientId,
+        operationType: toolName,
+        queryHash: this.securityManager.hashQuery(JSON.stringify(args || {})),
+        resultStatus: /permission|denied|rate limit|validation/i.test(message) ? 'denied' : 'error',
+        executionTimeMs: Date.now() - startTime,
+        errorMessage: message
+      });
+      throw error;
     }
   }
 
@@ -2083,6 +2328,305 @@ export class MCPSQLiteServer {
     } catch (error) {
       throw new Error(`Connection pool stats request failed: ${(error as Error).message}`);
     }
+  }
+
+  /**
+   * Handle SQLite UPSERT operation.
+   */
+  private async handleUpsert(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { table, data, conflictColumns, updateColumns } = args;
+
+    if (!permissions.includes('create') || !permissions.includes('update')) {
+      throw new Error('Insufficient permissions for upsert operation');
+    }
+
+    const result = this.databaseManager.upsertRecord(table, data, conflictColumns, updateColumns, clientId);
+
+    if (!result.success) {
+      throw new Error(result.error || 'Upsert operation failed');
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            success: true,
+            rowsAffected: result.rowsAffected,
+            lastInsertRowid: result.lastInsertRowid,
+            executionTime: result.executionTime
+          }, null, 2)
+        } as TextContent
+      ]
+    };
+  }
+
+  /**
+   * Handle safe PRAGMA operations.
+   */
+  private async handlePragma(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { operation, pragma, value } = args;
+
+    if (!permissions.includes('utility')) {
+      throw new Error('Insufficient permissions for PRAGMA operations');
+    }
+
+    if (!['list', 'get', 'set'].includes(operation)) {
+      throw new Error('operation must be one of: list, get, set');
+    }
+
+    const result = this.databaseManager.managePragma(operation, pragma, value);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        } as TextContent
+      ]
+    };
+  }
+
+  /**
+   * Handle SQLite integrity checks.
+   */
+  private async handleIntegrityCheck(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { checkType = 'quick', maxErrors = 100 } = args;
+
+    if (!permissions.includes('utility')) {
+      throw new Error('Insufficient permissions for integrity checks');
+    }
+
+    if (!['quick', 'integrity'].includes(checkType)) {
+      throw new Error('checkType must be quick or integrity');
+    }
+
+    const result = this.databaseManager.runIntegrityCheck(checkType, maxErrors);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        } as TextContent
+      ]
+    };
+  }
+
+  /**
+   * Handle SQLite foreign key checks.
+   */
+  private async handleForeignKeyCheck(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { table } = args;
+
+    if (!permissions.includes('utility')) {
+      throw new Error('Insufficient permissions for foreign key checks');
+    }
+
+    const result = this.databaseManager.runForeignKeyCheck(table);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        } as TextContent
+      ]
+    };
+  }
+
+  /**
+   * Handle VACUUM maintenance.
+   */
+  private async handleVacuum(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { mode = 'full', pages } = args;
+
+    if (!permissions.includes('utility')) {
+      throw new Error('Insufficient permissions for VACUUM maintenance');
+    }
+
+    if (!['full', 'incremental'].includes(mode)) {
+      throw new Error('mode must be full or incremental');
+    }
+
+    const result = this.databaseManager.vacuumDatabase(mode, pages);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        } as TextContent
+      ]
+    };
+  }
+
+  /**
+   * Handle ANALYZE, REINDEX, and optimize maintenance.
+   */
+  private async handleAnalyzeMaintenance(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { operation = 'analyze', target } = args;
+
+    if (!permissions.includes('utility')) {
+      throw new Error('Insufficient permissions for SQLite analysis maintenance');
+    }
+
+    if (!['analyze', 'reindex', 'optimize'].includes(operation)) {
+      throw new Error('operation must be analyze, reindex, or optimize');
+    }
+
+    const result = this.databaseManager.analyzeDatabase(operation, target);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        } as TextContent
+      ]
+    };
+  }
+
+  /**
+   * Handle WAL checkpoints.
+   */
+  private async handleWalCheckpoint(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { mode = 'PASSIVE' } = args;
+
+    if (!permissions.includes('utility')) {
+      throw new Error('Insufficient permissions for WAL checkpoint');
+    }
+
+    const result = this.databaseManager.runWalCheckpoint(mode);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        } as TextContent
+      ]
+    };
+  }
+
+  /**
+   * Handle EXPLAIN QUERY PLAN requests.
+   */
+  private async handleExplainQueryPlan(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { query, parameters = [], includeBytecode = false } = args;
+
+    if (!permissions.includes('read')) {
+      throw new Error('Insufficient permissions for query plan explanation');
+    }
+
+    const validation = await this.securityManager.validateQuery(query, parameters, permissions, clientId);
+    if (!validation.isValid) {
+      throw new Error(`Query plan validation failed: ${validation.reason}`);
+    }
+
+    const result = this.databaseManager.explainQueryPlan(query, parameters, Boolean(includeBytecode));
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        } as TextContent
+      ]
+    };
+  }
+
+  /**
+   * Handle table inspection.
+   */
+  private async handleTableInspect(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { table, sampleLimit = 0 } = args;
+
+    if (!permissions.includes('list') && !permissions.includes('read')) {
+      throw new Error('Insufficient permissions for table inspection');
+    }
+
+    if (!table) {
+      throw new Error('table is required');
+    }
+
+    const result = this.databaseManager.inspectTable(table, sampleLimit);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        } as TextContent
+      ]
+    };
+  }
+
+  /**
+   * Handle audit log retrieval.
+   */
+  private async handleAuditLogs(
+    args: Record<string, any>,
+    clientId: string,
+    permissions: PermissionType[]
+  ): Promise<CallToolResult> {
+    const { clientId: requestedClientId, limit = 100 } = args;
+
+    if (!permissions.includes('utility')) {
+      throw new Error('Insufficient permissions for audit logs');
+    }
+
+    const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 1000);
+    const logs = this.securityManager.getAuditLogs(requestedClientId, safeLimit);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            success: true,
+            count: logs.length,
+            logs
+          }, null, 2)
+        } as TextContent
+      ]
+    };
   }
 
   /**

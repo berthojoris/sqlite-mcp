@@ -15,7 +15,7 @@ A comprehensive Model Context Protocol (MCP) server implementation for SQLite da
   - [Cursor IDE](#cursor-ide)
   - [Continue.dev](#continuedev)
   - [Other MCP Clients](#other-mcp-clients)
-- [Available Tools (28 Tools)](#-available-tools)
+- [Available Tools (37 Tools)](#-available-tools)
 - [Tool Documentation](DOCUMENTATIONS.md)
 - [Permission System](#permission-system)
 - [Configuration](#-configuration)
@@ -139,8 +139,16 @@ Add this configuration to your MCP client's config file:
 | **Claude Desktop (Linux)** | `~/.config/Claude/claude_desktop_config.json` |
 | **Cursor IDE (macOS/Linux)** | `~/.cursor/mcp.json` |
 | **Cursor IDE (Windows)** | `%USERPROFILE%\.cursor\mcp.json` |
+| **Droid CLI** | Add as a stdio MCP server in Droid MCP settings |
+| **Claude CLI / Claude Code** | Add as a stdio MCP server in Claude MCP settings |
 | **Windsurf IDE** | `~/.windsurf/mcp.json` |
 | **Cline (VS Code)** | VS Code `settings.json` under `cline.mcpServers` |
+
+### Compatibility Notes
+
+- Uses the standard MCP stdio transport, so it is compatible with Cursor IDE, Droid CLI, Claude Desktop/CLI, Claude Code, Windsurf, Cline, and other stdio MCP clients.
+- Runtime logs are written to stderr to keep stdout reserved for MCP JSON-RPC messages.
+- Only implemented `tools` capability is advertised for maximum client compatibility.
 
 ### Platform-Specific Path Examples
 
@@ -371,7 +379,7 @@ list,read
 list,read,create,update,delete
 
 # Full database access
-list,read,create,update,delete,execute,ddl,transaction,utility
+list,read,create,update,delete,execute,ddl,procedure,transaction,utility
 
 # Analytics/reporting
 list,read,utility
@@ -382,7 +390,7 @@ list,read,create,update,delete,ddl,transaction,utility
 
 ## 🔌 Available Tools
 
-The MCP server provides **28 powerful tools** for comprehensive SQLite database management:
+The MCP server provides **37 powerful tools** for comprehensive SQLite database management:
 
 ### Tools Summary
 
@@ -415,6 +423,16 @@ The MCP server provides **28 powerful tools** for comprehensive SQLite database 
 | 25 | [`sqlite_database_health_check`](#sqlite_database_health_check) | Database health and integrity checks | `read` |
 | 26 | [`sqlite_unused_indexes`](#sqlite_unused_indexes) | Find unused or redundant indexes | `read` |
 | 27 | [`sqlite_connection_pool_stats`](#sqlite_connection_pool_stats) | Connection pool statistics | `read` |
+| 28 | [`sqlite_upsert`](#sqlite_upsert) | Insert-or-update records using ON CONFLICT | `create`, `update` |
+| 29 | [`sqlite_pragma`](#sqlite_pragma) | Safe SQLite PRAGMA management | `utility` |
+| 30 | [`sqlite_integrity_check`](#sqlite_integrity_check) | Run quick_check or integrity_check | `utility` |
+| 31 | [`sqlite_foreign_key_check`](#sqlite_foreign_key_check) | Find foreign key violations | `utility` |
+| 32 | [`sqlite_vacuum`](#sqlite_vacuum) | Run VACUUM or incremental_vacuum | `utility` |
+| 33 | [`sqlite_analyze`](#sqlite_analyze) | Run ANALYZE, REINDEX, or optimize | `utility` |
+| 34 | [`sqlite_wal_checkpoint`](#sqlite_wal_checkpoint) | Run WAL checkpoint maintenance | `utility` |
+| 35 | [`sqlite_explain_query_plan`](#sqlite_explain_query_plan) | Explain query plans and optional bytecode | `read` |
+| 36 | [`sqlite_table_inspect`](#sqlite_table_inspect) | Deep table metadata inspection | `list`, `read` |
+| 37 | [`sqlite_audit_logs`](#sqlite_audit_logs) | View recent MCP audit entries | `utility` |
 
 ### Tool Categories
 
@@ -428,6 +446,7 @@ The MCP server provides **28 powerful tools** for comprehensive SQLite database 
 - `sqlite_insert` - Create new records
 - `sqlite_update` - Modify existing records
 - `sqlite_delete` - Remove records
+- `sqlite_upsert` - Insert or update records with ON CONFLICT
 
 **Bulk Operations:**
 - `sqlite_bulk_insert` - Insert many records efficiently
@@ -449,6 +468,17 @@ The MCP server provides **28 powerful tools** for comprehensive SQLite database 
 - `sqlite_transaction` - Atomic multi-query execution
 - `sqlite_backup` - Database backup utility
 - `sqlite_backup_restore` - Backup tables and restore from SQL files
+
+**SQLite Maintenance & Diagnostics:**
+- `sqlite_pragma` - Read or update safe SQLite PRAGMA settings
+- `sqlite_integrity_check` - Run database integrity checks
+- `sqlite_foreign_key_check` - Detect foreign key violations
+- `sqlite_vacuum` - Reclaim space and rebuild database pages
+- `sqlite_analyze` - Refresh statistics, reindex, or optimize
+- `sqlite_wal_checkpoint` - Flush WAL frames back to the database
+- `sqlite_explain_query_plan` - Inspect query planner output
+- `sqlite_table_inspect` - Inspect columns, indexes, triggers, row counts, and samples
+- `sqlite_audit_logs` - Review recent MCP tool-call audit logs
 
 > 📖 **Full Documentation:** See [DOCUMENTATIONS.md](DOCUMENTATIONS.md) for detailed parameters, examples, and response formats for each tool.
 
@@ -492,4 +522,4 @@ For issues, questions, or contributions:
 
 ---
 
-**Last Updated**: 2025-12-20 20:00:00
+**Last Updated**: 2026-05-22 11:57:06

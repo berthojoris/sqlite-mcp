@@ -1,6 +1,6 @@
 # SQLite MCP Server - Tool Documentation
 
-Complete reference documentation for all 12 tools available in the SQLite MCP Server.
+Complete reference documentation for all 37 tools available in the SQLite MCP Server.
 
 ---
 
@@ -25,6 +25,31 @@ Complete reference documentation for all 12 tools available in the SQLite MCP Se
 - [Database Operation Tools](#database-operation-tools)
   - [sqlite_transaction](#sqlite_transaction)
   - [sqlite_backup](#sqlite_backup)
+- [Additional SQLite Tools](#additional-sqlite-tools)
+  - [sqlite_views](#sqlite_views)
+  - [sqlite_indexes](#sqlite_indexes)
+  - [sqlite_constraints](#sqlite_constraints)
+  - [sqlite_migrate](#sqlite_migrate)
+  - [sqlite_backup_restore](#sqlite_backup_restore)
+  - [sqlite_column_statistics](#sqlite_column_statistics)
+  - [sqlite_database_summary](#sqlite_database_summary)
+  - [sqlite_schema_erd](#sqlite_schema_erd)
+  - [sqlite_schema_rag_context](#sqlite_schema_rag_context)
+  - [sqlite_analyze_query](#sqlite_analyze_query)
+  - [sqlite_optimization_hints](#sqlite_optimization_hints)
+  - [sqlite_database_health_check](#sqlite_database_health_check)
+  - [sqlite_unused_indexes](#sqlite_unused_indexes)
+  - [sqlite_connection_pool_stats](#sqlite_connection_pool_stats)
+  - [sqlite_upsert](#sqlite_upsert)
+  - [sqlite_pragma](#sqlite_pragma)
+  - [sqlite_integrity_check](#sqlite_integrity_check)
+  - [sqlite_foreign_key_check](#sqlite_foreign_key_check)
+  - [sqlite_vacuum](#sqlite_vacuum)
+  - [sqlite_analyze](#sqlite_analyze)
+  - [sqlite_wal_checkpoint](#sqlite_wal_checkpoint)
+  - [sqlite_explain_query_plan](#sqlite_explain_query_plan)
+  - [sqlite_table_inspect](#sqlite_table_inspect)
+  - [sqlite_audit_logs](#sqlite_audit_logs)
 
 ---
 
@@ -792,6 +817,382 @@ Create a backup of the database.
   "success": true,
   "message": "Database backed up to /backups/mydb_2024-01-15.sqlite",
   "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+---
+
+## Additional SQLite Tools
+
+### sqlite_views
+
+Manage SQLite views.
+
+- **Permission:** `ddl`
+- **Operations:** `create_view`, `drop_view`, `list_views`, `get_view_info`
+- **Parameters:** `operation`, `viewName`, `selectQuery`, `ifNotExists`, `ifExists`
+
+```json
+{
+  "operation": "create_view",
+  "viewName": "active_users",
+  "selectQuery": "SELECT id, name FROM users WHERE active = 1",
+  "ifNotExists": true
+}
+```
+
+---
+
+### sqlite_indexes
+
+List, inspect, or analyze indexes.
+
+- **Permission:** `list` for read operations, `ddl` for index changes through `sqlite_ddl`
+- **Operations:** `list_indexes`, `get_index_info`, `analyze_index`
+- **Parameters:** `operation`, `indexName`
+
+```json
+{
+  "operation": "get_index_info",
+  "indexName": "idx_users_email"
+}
+```
+
+---
+
+### sqlite_constraints
+
+Inspect constraints and foreign keys.
+
+- **Permission:** `list`
+- **Operations:** `list_constraints`, `list_foreign_keys`
+- **Parameters:** `operation`, `tableName`
+
+```json
+{
+  "operation": "list_foreign_keys",
+  "tableName": "orders"
+}
+```
+
+---
+
+### sqlite_migrate
+
+Clone tables, compare structures, or copy data between compatible tables.
+
+- **Permission:** `read`, `create`
+- **Operations:** `clone_table`, `compare_structure`, `copy_data`
+- **Parameters:** `operation`, `sourceTable`, `targetTable`, `includeData`, `whereClause`
+
+```json
+{
+  "operation": "clone_table",
+  "sourceTable": "users",
+  "targetTable": "users_archive",
+  "includeData": true
+}
+```
+
+---
+
+### sqlite_backup_restore
+
+Back up one table to SQL, restore a SQL file, or return a CREATE TABLE statement.
+
+- **Permission:** `utility` or `read`
+- **Operations:** `backup_table`, `restore_from_sql`, `get_create_statement`
+- **Parameters:** `operation`, `tableName`, `backupPath`, `sqlPath`
+
+```json
+{
+  "operation": "get_create_statement",
+  "tableName": "users"
+}
+```
+
+---
+
+### sqlite_column_statistics
+
+Profile columns with row counts, distinct counts, null counts, and numeric min/max/average values.
+
+- **Permission:** `read`
+- **Parameters:** `tableName`
+
+```json
+{
+  "tableName": "users"
+}
+```
+
+---
+
+### sqlite_database_summary
+
+Return database metadata including file size, object counts, total rows, read-only status, and WAL status.
+
+- **Permission:** `read`
+- **Parameters:** none
+
+```json
+{}
+```
+
+---
+
+### sqlite_schema_erd
+
+Return ERD-ready entities and relationships from tables and foreign keys.
+
+- **Permission:** `read`
+- **Parameters:** none
+
+```json
+{}
+```
+
+---
+
+### sqlite_schema_rag_context
+
+Return a Markdown schema context optimized for AI/RAG usage.
+
+- **Permission:** `read`
+- **Parameters:** none
+
+```json
+{}
+```
+
+---
+
+### sqlite_analyze_query
+
+Analyze SQL with `EXPLAIN QUERY PLAN`, detected tables, query type, and complexity estimate.
+
+- **Permission:** `read`
+- **Parameters:** `query`
+
+```json
+{
+  "query": "SELECT * FROM users WHERE email = ?"
+}
+```
+
+---
+
+### sqlite_optimization_hints
+
+Return query optimization recommendations such as avoiding `SELECT *`, leading wildcard `LIKE`, or missing indexes.
+
+- **Permission:** `read`
+- **Parameters:** `query`
+
+```json
+{
+  "query": "SELECT * FROM users WHERE email LIKE '%@example.com'"
+}
+```
+
+---
+
+### sqlite_database_health_check
+
+Run health checks for integrity, quick check, foreign keys, and schema validity.
+
+- **Permission:** `read`
+- **Parameters:** none
+
+```json
+{}
+```
+
+---
+
+### sqlite_unused_indexes
+
+Find potentially unused or redundant indexes for cleanup review.
+
+- **Permission:** `read`
+- **Parameters:** none
+
+```json
+{}
+```
+
+---
+
+### sqlite_connection_pool_stats
+
+Return active, idle, and total connection pool counts.
+
+- **Permission:** `read`
+- **Parameters:** none
+
+```json
+{}
+```
+
+---
+
+### sqlite_upsert
+
+Insert or update one row with SQLite `ON CONFLICT`.
+
+- **Permission:** `create`, `update`
+- **Parameters:** `table`, `data`, `conflictColumns`, `updateColumns`
+
+```json
+{
+  "table": "users",
+  "data": {"email": "ada@example.com", "name": "Ada", "active": true},
+  "conflictColumns": ["email"],
+  "updateColumns": ["name", "active"]
+}
+```
+
+---
+
+### sqlite_pragma
+
+Safely list, read, or set allowlisted SQLite PRAGMA settings.
+
+- **Permission:** `utility`
+- **Operations:** `list`, `get`, `set`
+- **Parameters:** `operation`, `pragma`, `value`
+
+```json
+{
+  "operation": "set",
+  "pragma": "foreign_keys",
+  "value": true
+}
+```
+
+---
+
+### sqlite_integrity_check
+
+Run `PRAGMA quick_check` or `PRAGMA integrity_check`.
+
+- **Permission:** `utility`
+- **Parameters:** `checkType`, `maxErrors`
+
+```json
+{
+  "checkType": "quick",
+  "maxErrors": 100
+}
+```
+
+---
+
+### sqlite_foreign_key_check
+
+Run `PRAGMA foreign_key_check` globally or for one table.
+
+- **Permission:** `utility`
+- **Parameters:** `table`
+
+```json
+{
+  "table": "orders"
+}
+```
+
+---
+
+### sqlite_vacuum
+
+Run full `VACUUM` or `PRAGMA incremental_vacuum`.
+
+- **Permission:** `utility`
+- **Parameters:** `mode`, `pages`
+
+```json
+{
+  "mode": "incremental",
+  "pages": 500
+}
+```
+
+---
+
+### sqlite_analyze
+
+Run `ANALYZE`, `REINDEX`, or `PRAGMA optimize`.
+
+- **Permission:** `utility`
+- **Operations:** `analyze`, `reindex`, `optimize`
+- **Parameters:** `operation`, `target`
+
+```json
+{
+  "operation": "optimize"
+}
+```
+
+---
+
+### sqlite_wal_checkpoint
+
+Run `PRAGMA wal_checkpoint` with a safe mode.
+
+- **Permission:** `utility`
+- **Parameters:** `mode`
+
+```json
+{
+  "mode": "PASSIVE"
+}
+```
+
+---
+
+### sqlite_explain_query_plan
+
+Return `EXPLAIN QUERY PLAN` output and optional full bytecode.
+
+- **Permission:** `read`
+- **Parameters:** `query`, `parameters`, `includeBytecode`
+
+```json
+{
+  "query": "SELECT * FROM users WHERE email = ?",
+  "parameters": ["ada@example.com"],
+  "includeBytecode": false
+}
+```
+
+---
+
+### sqlite_table_inspect
+
+Inspect `table_xinfo`, indexes, foreign keys, triggers, CREATE statement, row count, and optional sample rows.
+
+- **Permission:** `list` or `read`
+- **Parameters:** `table`, `sampleLimit`
+
+```json
+{
+  "table": "users",
+  "sampleLimit": 5
+}
+```
+
+---
+
+### sqlite_audit_logs
+
+Return recent MCP tool-call audit entries from the current server process.
+
+- **Permission:** `utility`
+- **Parameters:** `clientId`, `limit`
+
+```json
+{
+  "limit": 50
 }
 ```
 

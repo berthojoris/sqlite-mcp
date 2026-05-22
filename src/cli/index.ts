@@ -14,6 +14,7 @@ import { DatabaseManager } from '../database';
 import { SecurityManager } from '../security';
 import { MCPSQLiteServer } from '../core/mcp-server';
 import { PermissionType, DatabaseConfig, ServerConfig } from '../types';
+import { PACKAGE_VERSION } from '../version';
 
 class SQLiteMCPCLI {
   private logger = createLogger({
@@ -25,6 +26,7 @@ class SQLiteMCPCLI {
     ),
     transports: [
       new transports.Console({
+        stderrLevels: ['error', 'warn', 'info', 'debug'],
         format: format.combine(
           format.colorize(),
           format.simple()
@@ -46,7 +48,7 @@ class SQLiteMCPCLI {
     this.program
       .name('mcp-sqlite-server')
       .description('SQLite MCP Server - Model Context Protocol implementation for SQLite')
-      .version('1.0.0');
+      .version(PACKAGE_VERSION);
 
     // Main command for MCP server
     this.program
@@ -160,7 +162,7 @@ class SQLiteMCPCLI {
   private parsePermissions(permissionsString: string): PermissionType[] {
     const validPermissions: PermissionType[] = [
       'list', 'read', 'create', 'update', 'delete', 
-      'execute', 'ddl', 'transaction', 'utility'
+      'execute', 'ddl', 'procedure', 'transaction', 'utility'
     ];
 
     const permissions = permissionsString
@@ -450,7 +452,7 @@ class SQLiteMCPCLI {
           "-y",
           "@berthojoris/mcp-sqlite-server",
           "sqlite:////path/to/full-access.sqlite",
-          "list,read,create,update,delete,execute,ddl,transaction,utility"
+            "list,read,create,update,delete,execute,ddl,procedure,transaction,utility"
         ]
       };
     }

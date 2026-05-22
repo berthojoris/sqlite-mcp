@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-05-22
+
+### Added
+- **New Tool: `sqlite_upsert`**: Insert-or-update records using SQLite `ON CONFLICT`
+- **New Tool: `sqlite_pragma`**: Safe allowlisted PRAGMA list/get/set management
+- **New Tool: `sqlite_integrity_check`**: Run `quick_check` or `integrity_check`
+- **New Tool: `sqlite_foreign_key_check`**: Detect foreign key violations globally or per table
+- **New Tool: `sqlite_vacuum`**: Run full or incremental vacuum maintenance
+- **New Tool: `sqlite_analyze`**: Run `ANALYZE`, `REINDEX`, or `PRAGMA optimize`
+- **New Tool: `sqlite_wal_checkpoint`**: Run WAL checkpoints with validated modes
+- **New Tool: `sqlite_explain_query_plan`**: Return query plans and optional bytecode
+- **New Tool: `sqlite_table_inspect`**: Inspect table metadata, indexes, triggers, row counts, and sample rows
+- **New Tool: `sqlite_audit_logs`**: View recent MCP tool-call audit entries
+
+### Changed
+- Increased tool count from 27 to 37 in source and documentation
+- Standardized package, CLI, MCP server, and database metadata version handling
+- Improved stdio MCP compatibility by sending runtime logs to stderr and advertising only implemented tool capabilities
+- Enhanced raw query handling to return rows for SQLite reader statements such as `WITH`, `PRAGMA`, `EXPLAIN`, and `RETURNING`
+- Added `procedure` to accepted permission parsing for consistency with documented permission types
+
 ## [1.3.0] - 2025-12-20
 
 ### Added

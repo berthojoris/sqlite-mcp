@@ -8,6 +8,7 @@ export { DatabaseManager } from './database';
 export { SecurityManager } from './security';
 export { ConfigManager } from './config';
 export { default as SQLiteMCPCLI } from './cli';
+export * from './version';
 
 // Export types
 export * from './types';

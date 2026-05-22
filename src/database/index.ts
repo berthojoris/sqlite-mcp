@@ -23,6 +23,7 @@ import { Logger } from 'winston';
 import * as path from 'path';
 import * as fs from 'fs';
 import { safeIdentifier, isValidIdentifier } from '../utils';
+import { PACKAGE_VERSION, SERVER_FEATURES } from '../version';
 
 export class DatabaseManager {
   private static instances: Map<string, DatabaseManager> = new Map();
@@ -32,6 +33,73 @@ export class DatabaseManager {
   private connectionPool: Database.Database[] = [];
   private activeConnections = 0;
   private maxConnections: number;
+  private readonly readablePragmas = new Set([
+    'application_id',
+    'auto_vacuum',
+    'busy_timeout',
+    'cache_size',
+    'cache_spill',
+    'case_sensitive_like',
+    'cell_size_check',
+    'compile_options',
+    'database_list',
+    'defer_foreign_keys',
+    'encoding',
+    'foreign_keys',
+    'freelist_count',
+    'function_list',
+    'ignore_check_constraints',
+    'incremental_vacuum',
+    'index_list',
+    'integrity_check',
+    'journal_mode',
+    'journal_size_limit',
+    'locking_mode',
+    'mmap_size',
+    'module_list',
+    'optimize',
+    'page_count',
+    'page_size',
+    'pragma_list',
+    'quick_check',
+    'read_uncommitted',
+    'recursive_triggers',
+    'reverse_unordered_selects',
+    'secure_delete',
+    'synchronous',
+    'table_list',
+    'temp_store',
+    'threads',
+    'trusted_schema',
+    'user_version',
+    'wal_autocheckpoint',
+    'wal_checkpoint'
+  ]);
+  private readonly writablePragmas = new Set([
+    'application_id',
+    'auto_vacuum',
+    'busy_timeout',
+    'cache_size',
+    'cache_spill',
+    'case_sensitive_like',
+    'defer_foreign_keys',
+    'foreign_keys',
+    'ignore_check_constraints',
+    'journal_mode',
+    'journal_size_limit',
+    'locking_mode',
+    'mmap_size',
+    'read_uncommitted',
+    'recursive_triggers',
+    'reverse_unordered_selects',
+    'secure_delete',
+    'synchronous',
+    'temp_store',
+    'threads',
+    'trusted_schema',
+    'user_version',
+    'wal_autocheckpoint'
+  ]);
 
   private constructor(config: DatabaseConfig, logger: Logger) {
     this.config = config;
@@ -217,9 +285,9 @@ export class DatabaseManager {
 
       // Insert or update server info
       const serverInfo = {
-        version: '1.0.0',
+        version: PACKAGE_VERSION,
         initialized_at: new Date().toISOString(),
-        features: JSON.stringify(['audit_logging', 'connection_pooling', 'schema_introspection'])
+        features: JSON.stringify(SERVER_FEATURES)
       };
 
       const stmt = this.db.prepare(`
@@ -282,28 +350,24 @@ export class DatabaseManager {
         paramCount: parameters.length 
       });
 
-      // Determine query type
+      const stmt = connection.prepare(query);
       const normalizedQuery = query.trim().toUpperCase();
-      const isSelect = normalizedQuery.startsWith('SELECT');
       const isInsert = normalizedQuery.startsWith('INSERT');
 
       let result: QueryResult;
 
-      if (isSelect) {
-        // SELECT queries
-        const stmt = connection.prepare(query);
+      if (stmt.reader) {
         const data = stmt.all(...parameters);
-        
+
         result = {
           success: true,
           data,
+          rowsAffected: data.length,
           executionTime: Date.now() - startTime
         };
       } else {
-        // INSERT, UPDATE, DELETE queries
-        const stmt = connection.prepare(query);
         const info = stmt.run(...parameters);
-        
+
         result = {
           success: true,
           rowsAffected: info.changes,
@@ -2137,6 +2201,350 @@ export class DatabaseManager {
       this.logger.error('Failed to get unused indexes', { error });
       throw error;
     }
+  }
+
+  /**
+   * Insert or update a record using SQLite ON CONFLICT.
+   */
+  public upsertRecord(
+    tableName: string,
+    data: Record<string, any>,
+    conflictColumns: string[],
+    updateColumns?: string[],
+    clientId: string = 'unknown'
+  ): QueryResult {
+    const startTime = Date.now();
+    const connection = this.getConnection();
+
+    try {
+      if (!data || typeof data !== 'object' || Array.isArray(data) || Object.keys(data).length === 0) {
+        throw new Error('data must be a non-empty object');
+      }
+      if (!Array.isArray(conflictColumns) || conflictColumns.length === 0) {
+        throw new Error('conflictColumns must contain at least one column');
+      }
+
+      const columns = Object.keys(data);
+      const columnSet = new Set(columns);
+      for (const col of conflictColumns) {
+        if (!columnSet.has(col)) {
+          throw new Error(`Conflict column "${col}" is missing from data`);
+        }
+      }
+
+      const safeTable = safeIdentifier(tableName, 'table name');
+      const safeColumns = columns.map(col => safeIdentifier(col, 'column name'));
+      const safeConflictColumns = conflictColumns.map(col => safeIdentifier(col, 'conflict column name'));
+      const columnsToUpdate = updateColumns && updateColumns.length > 0
+        ? updateColumns
+        : columns.filter(col => !conflictColumns.includes(col));
+
+      for (const col of columnsToUpdate) {
+        if (!columnSet.has(col)) {
+          throw new Error(`Update column "${col}" is missing from data`);
+        }
+      }
+
+      const placeholders = columns.map(() => '?').join(', ');
+      const conflictClause = `ON CONFLICT (${safeConflictColumns.join(', ')})`;
+      const updateClause = columnsToUpdate.length > 0
+        ? `DO UPDATE SET ${columnsToUpdate
+          .map(col => `${safeIdentifier(col, 'update column name')} = excluded.${safeIdentifier(col, 'update column name')}`)
+          .join(', ')}`
+        : 'DO NOTHING';
+      const query = `INSERT INTO ${safeTable} (${safeColumns.join(', ')}) VALUES (${placeholders}) ${conflictClause} ${updateClause}`;
+      const info = connection.prepare(query).run(...columns.map(col => data[col]));
+
+      return {
+        success: true,
+        rowsAffected: info.changes,
+        lastInsertRowid: Number(info.lastInsertRowid),
+        executionTime: Date.now() - startTime
+      };
+    } catch (error) {
+      this.logger.error('Upsert failed', { clientId, error: (error as Error).message });
+      return {
+        success: false,
+        error: (error as Error).message,
+        executionTime: Date.now() - startTime
+      };
+    } finally {
+      this.returnConnection(connection);
+    }
+  }
+
+  /**
+   * Read, update, or list safe SQLite PRAGMA settings.
+   */
+  public managePragma(operation: 'get' | 'set' | 'list', pragma?: string, value?: any): any {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const startTime = Date.now();
+
+    if (operation === 'list') {
+      const data = Array.from(this.readablePragmas)
+        .sort()
+        .map(name => ({
+          name,
+          writable: this.writablePragmas.has(name)
+        }));
+
+      return {
+        success: true,
+        data,
+        executionTime: Date.now() - startTime
+      };
+    }
+
+    if (!pragma) {
+      throw new Error('pragma is required');
+    }
+
+    const pragmaName = this.normalizePragmaName(pragma);
+
+    if (operation === 'set') {
+      if (!this.writablePragmas.has(pragmaName)) {
+        throw new Error(`PRAGMA "${pragmaName}" is read-only or not allowed to be changed`);
+      }
+
+      const formattedValue = this.formatPragmaValue(value);
+      this.db.pragma(`${pragmaName} = ${formattedValue}`);
+    }
+
+    return {
+      success: true,
+      pragma: pragmaName,
+      value: this.db.pragma(pragmaName),
+      writable: this.writablePragmas.has(pragmaName),
+      executionTime: Date.now() - startTime
+    };
+  }
+
+  /**
+   * Run SQLite integrity_check or quick_check.
+   */
+  public runIntegrityCheck(checkType: 'integrity' | 'quick' = 'quick', maxErrors: number = 100): any {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const startTime = Date.now();
+    const safeMaxErrors = Math.min(Math.max(Number(maxErrors) || 100, 1), 10000);
+    const pragmaName = checkType === 'integrity' ? 'integrity_check' : 'quick_check';
+    const rows = this.db.prepare(`PRAGMA ${pragmaName}(${safeMaxErrors})`).all() as any[];
+    const resultKey = pragmaName;
+    const ok = rows.length === 1 && rows[0][resultKey] === 'ok';
+
+    return {
+      success: true,
+      checkType,
+      ok,
+      issues: ok ? [] : rows.map(row => row[resultKey]),
+      raw: rows,
+      executionTime: Date.now() - startTime
+    };
+  }
+
+  /**
+   * Run SQLite foreign_key_check globally or for a specific table.
+   */
+  public runForeignKeyCheck(tableName?: string): any {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const startTime = Date.now();
+    const query = tableName
+      ? `PRAGMA foreign_key_check(${safeIdentifier(tableName, 'table name')})`
+      : 'PRAGMA foreign_key_check';
+    const violations = this.db.prepare(query).all() as any[];
+
+    return {
+      success: true,
+      tableName,
+      ok: violations.length === 0,
+      violationCount: violations.length,
+      violations,
+      executionTime: Date.now() - startTime
+    };
+  }
+
+  /**
+   * Run VACUUM or incremental_vacuum maintenance.
+   */
+  public vacuumDatabase(mode: 'full' | 'incremental' = 'full', pages?: number): any {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const startTime = Date.now();
+
+    if (mode === 'incremental') {
+      const safePages = pages === undefined ? undefined : Math.min(Math.max(Number(pages) || 0, 0), 1000000);
+      this.db.exec(safePages && safePages > 0 ? `PRAGMA incremental_vacuum(${safePages})` : 'PRAGMA incremental_vacuum');
+    } else {
+      this.db.exec('VACUUM');
+    }
+
+    return {
+      success: true,
+      mode,
+      pages,
+      executionTime: Date.now() - startTime
+    };
+  }
+
+  /**
+   * Run ANALYZE, REINDEX, or PRAGMA optimize.
+   */
+  public analyzeDatabase(operation: 'analyze' | 'reindex' | 'optimize' = 'analyze', target?: string): any {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const startTime = Date.now();
+    let result: any = null;
+
+    switch (operation) {
+      case 'analyze':
+        this.db.exec(target ? `ANALYZE ${safeIdentifier(target, 'ANALYZE target')}` : 'ANALYZE');
+        break;
+      case 'reindex':
+        this.db.exec(target ? `REINDEX ${safeIdentifier(target, 'REINDEX target')}` : 'REINDEX');
+        break;
+      case 'optimize':
+        result = this.db.pragma('optimize');
+        break;
+      default:
+        throw new Error(`Unknown analysis operation: ${operation}`);
+    }
+
+    return {
+      success: true,
+      operation,
+      target,
+      result,
+      executionTime: Date.now() - startTime
+    };
+  }
+
+  /**
+   * Run WAL checkpoint with a validated mode.
+   */
+  public runWalCheckpoint(mode: 'PASSIVE' | 'FULL' | 'RESTART' | 'TRUNCATE' = 'PASSIVE'): any {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const startTime = Date.now();
+    const normalizedMode = String(mode || 'PASSIVE').toUpperCase();
+    const allowedModes = new Set(['PASSIVE', 'FULL', 'RESTART', 'TRUNCATE']);
+
+    if (!allowedModes.has(normalizedMode)) {
+      throw new Error('mode must be one of PASSIVE, FULL, RESTART, TRUNCATE');
+    }
+
+    const result = this.db.prepare(`PRAGMA wal_checkpoint(${normalizedMode})`).all();
+
+    return {
+      success: true,
+      mode: normalizedMode,
+      result,
+      executionTime: Date.now() - startTime
+    };
+  }
+
+  /**
+   * Explain a SQL query without executing its data-changing form.
+   */
+  public explainQueryPlan(query: string, parameters: any[] = [], includeBytecode: boolean = false): any {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const startTime = Date.now();
+    const plan = this.db.prepare(`EXPLAIN QUERY PLAN ${query}`).all(...parameters);
+    const bytecode = includeBytecode
+      ? this.db.prepare(`EXPLAIN ${query}`).all(...parameters)
+      : undefined;
+
+    return {
+      success: true,
+      plan,
+      bytecode,
+      executionTime: Date.now() - startTime
+    };
+  }
+
+  /**
+   * Inspect a table using SQLite-native PRAGMA metadata plus optional sample rows.
+   */
+  public inspectTable(tableName: string, sampleLimit: number = 0): any {
+    if (!this.db) throw new Error('Database not initialized');
+    if (!isValidIdentifier(tableName)) throw new Error(`Invalid table name: ${tableName}`);
+
+    const startTime = Date.now();
+    const safeTable = safeIdentifier(tableName, 'table name');
+    const safeSampleLimit = Math.min(Math.max(Number(sampleLimit) || 0, 0), 100);
+    const columns = this.db.prepare(`PRAGMA table_xinfo(${safeTable})`).all() as any[];
+    const indexes = this.db.prepare(`PRAGMA index_list(${safeTable})`).all() as any[];
+    const indexDetails = indexes.map(index => ({
+      ...index,
+      columns: this.db!.prepare(`PRAGMA index_xinfo(${safeIdentifier(index.name, 'index name')})`).all()
+    }));
+    const foreignKeys = this.db.prepare(`PRAGMA foreign_key_list(${safeTable})`).all();
+    const triggers = this.db.prepare(`
+      SELECT name, sql as definition
+      FROM sqlite_master
+      WHERE type = 'trigger' AND tbl_name = ?
+      ORDER BY name
+    `).all(tableName);
+    const createStatement = this.db.prepare(`
+      SELECT sql
+      FROM sqlite_master
+      WHERE type IN ('table', 'view') AND name = ?
+    `).get(tableName);
+    const rowCount = this.db.prepare(`SELECT COUNT(*) as count FROM ${safeTable}`).get() as { count: number };
+    const sampleRows = safeSampleLimit > 0
+      ? this.db.prepare(`SELECT * FROM ${safeTable} LIMIT ?`).all(safeSampleLimit)
+      : [];
+
+    return {
+      success: true,
+      tableName,
+      columns,
+      indexes: indexDetails,
+      foreignKeys,
+      triggers,
+      createStatement,
+      rowCount: rowCount.count,
+      sampleRows,
+      executionTime: Date.now() - startTime
+    };
+  }
+
+  private normalizePragmaName(pragma: string): string {
+    const normalized = pragma.trim().toLowerCase();
+
+    if (!/^[a-z_]+$/.test(normalized)) {
+      throw new Error(`Invalid PRAGMA name: ${pragma}`);
+    }
+    if (!this.readablePragmas.has(normalized)) {
+      throw new Error(`PRAGMA "${normalized}" is not in the safe allowlist`);
+    }
+
+    return normalized;
+  }
+
+  private formatPragmaValue(value: any): string {
+    if (value === undefined || value === null) {
+      throw new Error('PRAGMA value is required');
+    }
+    if (typeof value === 'boolean') {
+      return value ? 'ON' : 'OFF';
+    }
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) {
+        throw new Error('PRAGMA numeric value must be finite');
+      }
+      return String(value);
+    }
+    if (typeof value === 'string') {
+      if (value.length > 256 || value.includes('\x00')) {
+        throw new Error('Invalid PRAGMA string value');
+      }
+      return `'${value.replace(/'/g, "''")}'`;
+    }
+
+    throw new Error('PRAGMA value must be a string, number, or boolean');
   }
 
   /**
