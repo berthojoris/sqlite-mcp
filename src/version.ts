@@ -1,4 +1,4 @@
-export const PACKAGE_VERSION = '1.4.0';
+export const PACKAGE_VERSION = '1.4.1';
 
 export const SERVER_FEATURES = [
   'audit_logging',

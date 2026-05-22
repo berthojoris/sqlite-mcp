@@ -515,11 +515,11 @@ MIT License - see LICENSE file for details.
 ## 🆘 Support
 
 For issues, questions, or contributions:
-- GitHub Issues: [Repository Issues](https://github.com/berthojoris/mcp-sqlite-server/issues)
-- Documentation: [Full Documentation](https://github.com/berthojoris/mcp-sqlite-server/wiki)
+- GitHub Issues: [Repository Issues](https://github.com/berthojoris/sqlite-mcp/issues)
+- Documentation: [Full Documentation](https://github.com/berthojoris/sqlite-mcp/wiki)
 
 **Note**: This server is designed for secure, controlled access to SQLite databases through the Model Context Protocol. Always follow security best practices and regularly review audit logs in production environments.
 
 ---
 
-**Last Updated**: 2026-05-22 11:57:06
+**Last Updated**: 2026-05-22 14:35:11

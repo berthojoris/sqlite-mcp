@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.1] - 2026-05-22
+
+### Changed
+- Corrected package repository metadata and README support links to `https://github.com/berthojoris/sqlite-mcp`
+
 ## [1.4.0] - 2026-05-22
 
 ### Added
